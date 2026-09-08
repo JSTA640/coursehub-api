@@ -1,12 +1,12 @@
-import { controller, Get } from '@nestjs/common';
-import { WelcomeService } from './Welcome.service';
+import { Controller, Get } from '@nestjs/common'; // 1
+import { WelcomeService } from './welcome.service'; // 2
 
-@Controller('welcome')
-export class WelcomeController {
-  constructor(private readonly welcomeService: WelcomeService) {}
+@Controller('welcome') // 3
+export class WelcomeController { // 4
+  constructor(private readonly welcomeService: WelcomeService) {} // 5
 
- @Get()
-getWelcome(): {Message: string} {
-  return this.welcomeService.getWelcome();
-}
+  @Get() // 6
+  getWelcome(): { message: string } { // 7
+    return this.welcomeService.getMessage(); // 8
+  }
 }
