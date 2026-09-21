@@ -1,12 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe, ParseBoolPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe, ParseBoolPipe, HttpCode, HttpStatus, Inject } from '@nestjs/common';
 import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
+import { EnrollmentsService } from '../enrollments/enrollments.service';
 
 @Controller('students')
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) {}
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly enrollmentsService: EnrollmentsService,
+  ) {}
 
   @Post()
   create(@Body() createStudentDto: CreateStudentDto) {
@@ -21,6 +25,11 @@ export class StudentsController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.studentsService.findOne(id);
+  }
+  
+  @Get(':studentId/enrollments')
+  findEnrollments(@Param('studentId', ParseIntPipe) studentId: number) {
+    return this.enrollmentsService.findByStudent(studentId);
   }
 
   @Patch(':id')
@@ -38,4 +47,5 @@ export class StudentsController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.studentsService.remove(id);
   }
+  
 }
