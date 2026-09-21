@@ -3,14 +3,10 @@ import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { FilterStudentDto } from './dto/filter-student.dto';
-import { EnrollmentsService } from '../enrollments/enrollments.service';
 
 @Controller('students')
 export class StudentsController {
-  constructor(
-    private readonly studentsService: StudentsService,
-    private readonly enrollmentsService: EnrollmentsService,
-  ) {}
+  constructor(private readonly studentsService: StudentsService) {}
 
   @Post()
   create(@Body() createStudentDto: CreateStudentDto) {
@@ -27,11 +23,6 @@ export class StudentsController {
     return this.studentsService.findOne(id);
   }
   
-  @Get(':studentId/enrollments')
-  findEnrollments(@Param('studentId', ParseIntPipe) studentId: number) {
-    return this.enrollmentsService.findByStudent(studentId);
-  }
-
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() updateStudentDto: UpdateStudentDto) {
     return this.studentsService.update(id, updateStudentDto);
