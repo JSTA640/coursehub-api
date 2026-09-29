@@ -19,7 +19,7 @@ export class EnrollmentsService {
     private readonly coursesService: CoursesService,
   ) {}
 
-  create(createEnrollmentDto: CreateEnrollmentDto): Enrollment {
+  async create(createEnrollmentDto: CreateEnrollmentDto): Promise<Enrollment> {
     const { studentId, courseId } = createEnrollmentDto;
 
     // 1. Verificar si el estudiante existe
@@ -34,10 +34,7 @@ export class EnrollmentsService {
     }
 
     // 3. Verificar si el curso existe
-    const course = this.coursesService.findOne(courseId);
-    if (!course) {
-      throw new NotFoundException(`El curso con ID ${courseId} no existe`);
-    }
+    await this.coursesService.findOne(courseId);
 
     // 4. Verificar duplicados (misma combinación studentId y courseId)
     const exists = this.enrollments.some(
@@ -82,12 +79,9 @@ export class EnrollmentsService {
     return this.enrollments.filter((e) => e.studentId === studentId);
   }
 
-  findByCourse(courseId: number): Enrollment[] {
+  async findByCourse(courseId: number): Promise<Enrollment[]> {
     // Verificar si el curso existe
-    const course = this.coursesService.findOne(courseId);
-    if (!course) {
-      throw new NotFoundException(`El curso con ID ${courseId} no existe`);
-    }
+    await this.coursesService.findOne(courseId);
     return this.enrollments.filter((e) => e.courseId === courseId);
   }
 
