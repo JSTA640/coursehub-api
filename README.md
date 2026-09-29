@@ -1,6 +1,6 @@
 # API de Gestion Educativa
 
-API desarrollada con NestJS para gestionar cursos, estudiantes y matriculas usando listas en memoria. El proyecto no utiliza PostgreSQL, TypeORM ni repositorios.
+API desarrollada con NestJS para gestionar cursos, estudiantes y matriculas usando listas en memoria. 
 
 ## Requisitos
 
