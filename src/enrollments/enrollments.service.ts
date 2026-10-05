@@ -1,95 +1,101 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { StudentsService } from '../students/students.service';
-import { CoursesService } from '../courses/courses.service';
-import { CreateEnrollmentDto } from './dto/create-Enrollment.dto';
-
-export type Enrollment = {
-  id: number;
-  studentId: number;
-  courseId: number;
-};
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { StudentsService } from '../students/students.service.js';
+import { CoursesService } from '../courses/courses.service.js';
+import { CreateEnrollmentDto } from './dto/create-Enrollment.dto.js';
+import { Enrollment } from './entities/enrollment.entity.js';
 
 @Injectable()
 export class EnrollmentsService {
-  private readonly enrollments: Enrollment[] = [];
-  private nextId = 1;
-
   constructor(
+    @InjectRepository(Enrollment)
+    private readonly enrollmentsRepository: Repository<Enrollment>,
     private readonly studentsService: StudentsService,
     private readonly coursesService: CoursesService,
   ) {}
 
   async create(createEnrollmentDto: CreateEnrollmentDto): Promise<Enrollment> {
     const { studentId, courseId } = createEnrollmentDto;
-
-    // 1. Verificar si el estudiante existe
-    const student = this.studentsService.findOne(studentId);
-    if (!student) {
-      throw new NotFoundException(`El estudiante con ID ${studentId} no existe`);
-    }
-
-    // 2. Verificar si el estudiante está activo
+    const student = await this.studentsService.findOne(studentId);
+    const course = await this.coursesService.findOne(courseId);
     if (!student.isActive) {
       throw new BadRequestException(`El estudiante con ID ${studentId} se encuentra inactivo`);
     }
 
-    // 3. Verificar si el curso existe
-    await this.coursesService.findOne(courseId);
-
-    // 4. Verificar duplicados (misma combinación studentId y courseId)
-    const exists = this.enrollments.some(
-      (e) => e.studentId === studentId && e.courseId === courseId,
-    );
-    if (exists) {
+    const existing = await this.enrollmentsRepository.findOne({
+      where: { student: { id: studentId }, course: { id: courseId } },
+      relations: { student: true, course: true },
+    });
+    if (existing) {
       throw new ConflictException(
         `El estudiante ${studentId} ya está matriculado en el curso ${courseId}`,
       );
     }
 
-    // Registrar matrícula
-    const newEnrollment: Enrollment = {
-      id: this.nextId++,
-      studentId,
-      courseId,
-    };
-    this.enrollments.push(newEnrollment);
-
-    return newEnrollment;
+    try {
+      return await this.enrollmentsRepository.save(
+        this.enrollmentsRepository.create({ student, course }),
+      );
+    } catch (error: unknown) {
+      if (isEnrollmentUniqueViolation(error)) {
+        throw new ConflictException(
+          `El estudiante ${studentId} ya está matriculado en el curso ${courseId}`,
+        );
+      }
+      throw error;
+    }
   }
 
-  findAll(filter?: { studentId?: number; courseId?: number }): Enrollment[] {
-    let result = this.enrollments;
-
-    if (filter?.studentId) {
-      result = result.filter((e) => e.studentId === filter.studentId);
-    }
-    if (filter?.courseId) {
-      result = result.filter((e) => e.courseId === filter.courseId);
-    }
-
-    return result;
+  findAll(filter: { studentId?: number; courseId?: number } = {}): Promise<Enrollment[]> {
+    const where: {
+      student?: { id: number };
+      course?: { id: number };
+    } = {};
+    if (filter.studentId !== undefined) where.student = { id: filter.studentId };
+    if (filter.courseId !== undefined) where.course = { id: filter.courseId };
+    return this.enrollmentsRepository.find({
+      where,
+      relations: { student: true, course: true },
+    });
   }
 
-  findByStudent(studentId: number): Enrollment[] {
-    // Verificar si el estudiante existe
-    const student = this.studentsService.findOne(studentId);
-    if (!student) {
-      throw new NotFoundException(`El estudiante con ID ${studentId} no existe`);
-    }
-    return this.enrollments.filter((e) => e.studentId === studentId);
+  async findByStudent(studentId: number): Promise<Enrollment[]> {
+    await this.studentsService.findOne(studentId);
+    return this.enrollmentsRepository.find({
+      where: { student: { id: studentId } },
+      relations: { student: true, course: true },
+    });
   }
 
   async findByCourse(courseId: number): Promise<Enrollment[]> {
-    // Verificar si el curso existe
     await this.coursesService.findOne(courseId);
-    return this.enrollments.filter((e) => e.courseId === courseId);
+    return this.enrollmentsRepository.find({
+      where: { course: { id: courseId } },
+      relations: { student: true, course: true },
+    });
   }
 
-  remove(id: number): void {
-    const index = this.enrollments.findIndex((e) => e.id === id);
-    if (index === -1) {
+  async remove(id: number): Promise<void> {
+    const enrollment = await this.enrollmentsRepository.findOneBy({ id });
+    if (!enrollment) {
       throw new NotFoundException(`La matrícula con ID ${id} no fue encontrada`);
     }
-    this.enrollments.splice(index, 1);
+    await this.enrollmentsRepository.remove(enrollment);
   }
+}
+
+function isEnrollmentUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('driverError' in error)) {
+    return false;
+  }
+  const driverError = error.driverError;
+  return (
+    typeof driverError === 'object' &&
+    driverError !== null &&
+    'code' in driverError &&
+    driverError.code === '23505' &&
+    'constraint' in driverError &&
+    driverError.constraint === 'UQ_enrollments_student_course'
+  );
 }

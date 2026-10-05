@@ -10,7 +10,10 @@ export class FilterStudentDto {
   @IsInt()
   @Min(1)
   @Max(10)
-  @Transform(({ value }) => (value ? parseInt(value, 10) : undefined))
+  @Transform(({ value }) => {
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) return Number.NaN;
+    return Number(value);
+  })
   semester?: number;
 
   @IsOptional()
@@ -18,7 +21,7 @@ export class FilterStudentDto {
   @Transform(({ value }) => {
     if (value === 'true') return true;
     if (value === 'false') return false;
-    return undefined;
+    return value;
   })
   isActive?: boolean;
 }

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { createcourseDto } from './dto/create-courses.dto';
+import { createcourseDto } from './dto/create-courses.dto.js';
 import { Repository } from 'typeorm';
 import { Course } from './entities/course.entity.js';
 
@@ -40,7 +40,27 @@ export class CoursesService {
 
   async remove(id: number) {
     const course = await this.findOne(id); // 9
-    await this.coursesRepository.remove(course); // 10
+    try {
+      await this.coursesRepository.remove(course); // 10
+    } catch (error: unknown) {
+      if (isForeignKeyViolation(error)) {
+        throw new ConflictException('No se puede eliminar un curso con matrículas existentes.');
+      }
+      throw error;
+    }
     return course;
   }
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('driverError' in error)) {
+    return false;
+  }
+  const driverError = error.driverError;
+  return (
+    typeof driverError === 'object' &&
+    driverError !== null &&
+    'code' in driverError &&
+    driverError.code === '23503'
+  );
 }

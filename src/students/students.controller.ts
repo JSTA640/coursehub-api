@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe, ParseBoolPipe, HttpCode, HttpStatus, Inject } from '@nestjs/common';
-import { StudentsService } from './students.service';
-import { CreateStudentDto } from './dto/create-student.dto';
-import { UpdateStudentDto } from './dto/update-student.dto';
-import { FilterStudentDto } from './dto/filter-student.dto';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, ParseIntPipe, ParseBoolPipe, HttpCode, HttpStatus } from '@nestjs/common';
+import { StudentsService } from './students.service.js';
+import { CreateStudentDto } from './dto/create-student.dto.js';
+import { UpdateStudentDto } from './dto/update-student.dto.js';
+import { FilterStudentDto } from './dto/filter-student.dto.js';
 
 @Controller('students')
 export class StudentsController {
