@@ -1,24 +1,32 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { StudentsService } from '../students/students.service.js';
-import { CoursesService } from '../courses/courses.service.js';
 import { CreateEnrollmentDto } from './dto/create-Enrollment.dto.js';
 import { Enrollment } from './entities/enrollment.entity.js';
+import { Student } from '../students/entities/student.entity.js';
+import { Course } from '../courses/entities/course.entity.js';
 
 @Injectable()
 export class EnrollmentsService {
   constructor(
     @InjectRepository(Enrollment)
     private readonly enrollmentsRepository: Repository<Enrollment>,
-    private readonly studentsService: StudentsService,
-    private readonly coursesService: CoursesService,
+    @InjectRepository(Student)
+    private readonly studentsRepository: Repository<Student>,
+    @InjectRepository(Course)
+    private readonly coursesRepository: Repository<Course>,
   ) {}
 
   async create(createEnrollmentDto: CreateEnrollmentDto): Promise<Enrollment> {
     const { studentId, courseId } = createEnrollmentDto;
-    const student = await this.studentsService.findOne(studentId);
-    const course = await this.coursesService.findOne(courseId);
+    const student = await this.studentsRepository.findOneBy({ id: studentId });
+    if (!student) {
+      throw new NotFoundException(`Estudiante con ID ${studentId} no encontrado.`);
+    }
+    const course = await this.coursesRepository.findOneBy({ id: courseId });
+    if (!course) {
+      throw new NotFoundException(`El curso con ID ${courseId} no existe`);
+    }
     if (!student.isActive) {
       throw new BadRequestException(`El estudiante con ID ${studentId} se encuentra inactivo`);
     }
@@ -57,22 +65,31 @@ export class EnrollmentsService {
     return this.enrollmentsRepository.find({
       where,
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
   }
 
   async findByStudent(studentId: number): Promise<Enrollment[]> {
-    await this.studentsService.findOne(studentId);
+    const student = await this.studentsRepository.findOneBy({ id: studentId });
+    if (!student) {
+      throw new NotFoundException(`Estudiante con ID ${studentId} no encontrado.`);
+    }
     return this.enrollmentsRepository.find({
       where: { student: { id: studentId } },
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
   }
 
   async findByCourse(courseId: number): Promise<Enrollment[]> {
-    await this.coursesService.findOne(courseId);
+    const course = await this.coursesRepository.findOneBy({ id: courseId });
+    if (!course) {
+      throw new NotFoundException(`El curso con ID ${courseId} no existe`);
+    }
     return this.enrollmentsRepository.find({
       where: { course: { id: courseId } },
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
   }
 

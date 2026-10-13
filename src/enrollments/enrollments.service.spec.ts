@@ -3,9 +3,9 @@ import { jest } from '@jest/globals';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EnrollmentsService } from './enrollments.service.js';
-import { StudentsService } from '../students/students.service.js';
-import { CoursesService } from '../courses/courses.service.js';
 import { Enrollment } from './entities/enrollment.entity.js';
+import { Student } from '../students/entities/student.entity.js';
+import { Course } from '../courses/entities/course.entity.js';
 
 describe('EnrollmentsService', () => {
   let service: EnrollmentsService;
@@ -17,8 +17,8 @@ describe('EnrollmentsService', () => {
     remove: jest.Mock;
     save: jest.Mock;
   };
-  let studentsService: { findOne: jest.Mock };
-  let coursesService: { findOne: jest.Mock };
+  let studentsRepository: { findOneBy: jest.Mock };
+  let coursesRepository: { findOneBy: jest.Mock };
 
   beforeEach(async () => {
     repository = {
@@ -29,14 +29,14 @@ describe('EnrollmentsService', () => {
       remove: jest.fn(),
       save: jest.fn(),
     };
-    studentsService = { findOne: jest.fn() };
-    coursesService = { findOne: jest.fn() };
+    studentsRepository = { findOneBy: jest.fn() };
+    coursesRepository = { findOneBy: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EnrollmentsService,
         { provide: getRepositoryToken(Enrollment), useValue: repository },
-        { provide: StudentsService, useValue: studentsService },
-        { provide: CoursesService, useValue: coursesService },
+        { provide: getRepositoryToken(Student), useValue: studentsRepository },
+        { provide: getRepositoryToken(Course), useValue: coursesRepository },
       ],
     }).compile();
 
@@ -46,8 +46,8 @@ describe('EnrollmentsService', () => {
   it('persists a valid enrollment with student and course relations', async () => {
     const student = { id: 1, isActive: true };
     const course = { id: 2, title: 'Databases' };
-    studentsService.findOne.mockResolvedValue(student);
-    coursesService.findOne.mockResolvedValue(course);
+    studentsRepository.findOneBy.mockResolvedValue(student);
+    coursesRepository.findOneBy.mockResolvedValue(course);
     repository.findOne.mockResolvedValue(null);
     repository.save.mockImplementation(async (enrollment) => ({ id: 8, ...enrollment }));
 
@@ -59,16 +59,16 @@ describe('EnrollmentsService', () => {
   });
 
   it('returns not found when the student does not exist', async () => {
-    studentsService.findOne.mockRejectedValue(new NotFoundException());
+    studentsRepository.findOneBy.mockResolvedValue(null);
 
     await expect(service.create({ studentId: 1, courseId: 2 }))
       .rejects.toBeInstanceOf(NotFoundException);
-    expect(coursesService.findOne).not.toHaveBeenCalled();
+    expect(coursesRepository.findOneBy).not.toHaveBeenCalled();
   });
 
   it('returns not found when the course does not exist', async () => {
-    studentsService.findOne.mockResolvedValue({ id: 1, isActive: true });
-    coursesService.findOne.mockRejectedValue(new NotFoundException());
+    studentsRepository.findOneBy.mockResolvedValue({ id: 1, isActive: true });
+    coursesRepository.findOneBy.mockResolvedValue(null);
 
     await expect(service.create({ studentId: 1, courseId: 2 }))
       .rejects.toBeInstanceOf(NotFoundException);
@@ -76,8 +76,8 @@ describe('EnrollmentsService', () => {
   });
 
   it('refuses to enroll an inactive student', async () => {
-    studentsService.findOne.mockResolvedValue({ id: 1, isActive: false });
-    coursesService.findOne.mockResolvedValue({ id: 2 });
+    studentsRepository.findOneBy.mockResolvedValue({ id: 1, isActive: false });
+    coursesRepository.findOneBy.mockResolvedValue({ id: 2 });
 
     await expect(service.create({ studentId: 1, courseId: 2 }))
       .rejects.toBeInstanceOf(BadRequestException);
@@ -85,8 +85,8 @@ describe('EnrollmentsService', () => {
   });
 
   it('rejects an already existing student-course pair', async () => {
-    studentsService.findOne.mockResolvedValue({ id: 1, isActive: true });
-    coursesService.findOne.mockResolvedValue({ id: 2 });
+    studentsRepository.findOneBy.mockResolvedValue({ id: 1, isActive: true });
+    coursesRepository.findOneBy.mockResolvedValue({ id: 2 });
     repository.findOne.mockResolvedValue({ id: 8 });
 
     await expect(service.create({ studentId: 1, courseId: 2 }))
@@ -95,8 +95,8 @@ describe('EnrollmentsService', () => {
   });
 
   it('converts a concurrent unique-pair violation to conflict', async () => {
-    studentsService.findOne.mockResolvedValue({ id: 1, isActive: true });
-    coursesService.findOne.mockResolvedValue({ id: 2 });
+    studentsRepository.findOneBy.mockResolvedValue({ id: 1, isActive: true });
+    coursesRepository.findOneBy.mockResolvedValue({ id: 2 });
     repository.findOne.mockResolvedValue(null);
     repository.save.mockRejectedValue({
       driverError: { code: '23505', constraint: 'UQ_enrollments_student_course' },
@@ -114,23 +114,26 @@ describe('EnrollmentsService', () => {
     expect(repository.find).toHaveBeenCalledWith({
       where: { student: { id: 1 }, course: { id: 2 } },
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
   });
 
   it('validates resources and loads relations in per-resource listings', async () => {
-    studentsService.findOne.mockResolvedValue({ id: 1 });
-    coursesService.findOne.mockResolvedValue({ id: 2 });
+    studentsRepository.findOneBy.mockResolvedValue({ id: 1 });
+    coursesRepository.findOneBy.mockResolvedValue({ id: 2 });
     repository.find.mockResolvedValue([]);
 
     await service.findByStudent(1);
     expect(repository.find).toHaveBeenLastCalledWith({
       where: { student: { id: 1 } },
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
     await service.findByCourse(2);
     expect(repository.find).toHaveBeenLastCalledWith({
       where: { course: { id: 2 } },
       relations: { student: true, course: true },
+      order: { id: 'ASC' },
     });
   });
 
