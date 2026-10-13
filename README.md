@@ -38,7 +38,7 @@ matrículas permanecen almacenados tras reiniciar la API.
 | Método | Ruta | Descripción | Parámetros / body |
 | --- | --- | --- | --- |
 | `POST` | `/courses` | Crea un curso. | `{ "title": "Bases de datos", "level": "Inicial" }` |
-| `GET` | `/courses` | Lista cursos. | Filtro opcional `level` |
+| `GET` | `/courses` | Lista cursos con paginación y orden estable. | `level`, `page`, `limit`, `sortBy`, `order` opcionales |
 | `GET` | `/courses/:id` | Consulta curso. | ID positivo |
 | `PATCH` | `/courses/:id` | Modifica curso. | Body parcial de curso |
 | `DELETE` | `/courses/:id` | Elimina curso sin matrículas. | ID positivo |
@@ -55,6 +55,19 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
 
 ## Persistencia, reglas y respuestas
+
+El listado de cursos responde `{ items, meta }`. `page` inicia en `1`,
+`limit` en `10` (máximo `50`), `sortBy` admite `id`, `title` o `level`, y
+`order` admite `ASC` o `DESC`. El orden predeterminado es por `id` ascendente.
+El filtro `level` es opcional y exacto. Por ejemplo:
+
+```http
+GET /courses?level=beginner&page=2&limit=5&sortBy=title&order=ASC
+```
+
+La respuesta contiene los cursos de la página en `items` y metadatos
+`total`, `page`, `limit` y `totalPages` en `meta`. Valores como `page=0`,
+`limit=200`, `sortBy=createdAt` u `order=sideways` producen `400 Bad Request`.
 
 La entidad `Student` tiene correo único en PostgreSQL. El servicio también
 comprueba duplicados y normaliza el correo sin distinguir mayúsculas; si la

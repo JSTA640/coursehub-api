@@ -1,8 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createcourseDto } from './dto/create-courses.dto.js';
-import { Repository } from 'typeorm';
+import { FindOptionsOrder, Repository } from 'typeorm';
 import { Course } from './entities/course.entity.js';
+import { CoursesQueryDto } from './dto/courses-query.dto.js';
 
 type UpdateCourseInput = {
   title?: string;
@@ -17,8 +18,26 @@ export class CoursesService {
     private readonly coursesRepository: Repository<Course>,
   ) {} // 1
 
-  findAll(level?: string) { // 2
-    return this.coursesRepository.find({ where: level ? { level } : {} }); // 3
+  async findAll(query: CoursesQueryDto) {
+    const { level, page, limit, sortBy, order } = query;
+    const sort: FindOptionsOrder<Course> = {};
+    sort[sortBy] = order;
+    const [items, total] = await this.coursesRepository.findAndCount({
+      where: level ? { level } : {},
+      order: sort,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: number): Promise<Course> {

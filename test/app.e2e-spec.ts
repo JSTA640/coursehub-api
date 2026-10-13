@@ -54,12 +54,58 @@ describe('AppController (e2e)', () => {
     const firstCourseId: number = firstCourseResponse.body.id;
     courseIds.push(firstCourseId);
 
+    const paginationCourseTitles = [`Álgebra ${uniqueTag}`, `Biología ${uniqueTag}`,
+      `Cálculo ${uniqueTag}`, `Diseño ${uniqueTag}`, `Estadística ${uniqueTag}`,
+      `Física ${uniqueTag}`, `Geometría ${uniqueTag}`];
+    for (const title of paginationCourseTitles) {
+      const response = await request(server)
+        .post('/courses')
+        .send({ title, level: 'beginner' })
+        .expect(201);
+      courseIds.push(response.body.id);
+    }
+
     const secondCourseResponse = await request(server)
       .post('/courses')
       .send({ title: `Otro curso ${uniqueTag}`, level: 'intermediate' })
       .expect(201);
     const secondCourseId: number = secondCourseResponse.body.id;
     courseIds.push(secondCourseId);
+
+    const firstPage = await request(server)
+      .get('/courses')
+      .query({ level: 'beginner', page: 1, limit: 3, sortBy: 'title', order: 'ASC' })
+      .expect(200);
+    const secondPage = await request(server)
+      .get('/courses')
+      .query({ level: 'beginner', page: 2, limit: 3, sortBy: 'title', order: 'ASC' })
+      .expect(200);
+    expect(firstPage.body.items).toHaveLength(3);
+    expect(secondPage.body.items).toHaveLength(3);
+    expect(firstPage.body.meta).toMatchObject({ page: 1, limit: 3 });
+    expect(firstPage.body.meta.total).toBeGreaterThanOrEqual(8);
+    expect(firstPage.body.meta.totalPages).toBeGreaterThanOrEqual(3);
+    expect(firstPage.body.items.map((course: Course) => course.id))
+      .not.toEqual(expect.arrayContaining(secondPage.body.items.map((course: Course) => course.id)));
+    for (const page of [firstPage.body, secondPage.body]) {
+      const titles = page.items.map((course: Course) => course.title);
+      expect(titles).toEqual([...titles].sort((left, right) => left.localeCompare(right)));
+    }
+
+    for (const invalidQuery of [
+      { page: 0 },
+      { limit: 200 },
+      { sortBy: 'createdAt' },
+      { order: 'sideways' },
+    ]) {
+      await request(server).get('/courses').query(invalidQuery).expect(400);
+    }
+
+    const defaultList = await request(server).get('/courses').expect(200);
+    expect(defaultList.body).toHaveProperty('items');
+    expect(defaultList.body).toHaveProperty('meta');
+    expect(defaultList.body.items.length).toBeLessThanOrEqual(10);
+    expect(defaultList.body.meta).toMatchObject({ page: 1, limit: 10 });
 
     const studentResponse = await request(server)
       .post('/students')
