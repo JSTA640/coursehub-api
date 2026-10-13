@@ -3,7 +3,7 @@ import { Controller, Get, Post, Delete, Body, Param, Query, HttpCode, HttpStatus
 import { EnrollmentsService } from './enrollments.service.js';
 import { CreateEnrollmentDto } from './dto/create-Enrollment.dto.js';
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe.js';
-import { FilterEnrollmentDto } from './dto/filter-enrollment.dto.js';
+import { EnrollmentsQueryDto } from './dto/enrollments-query.dto.js';
 
 @Controller()
 export class EnrollmentsController {
@@ -15,8 +15,8 @@ export class EnrollmentsController {
   }
 
   @Get('enrollments')
-  findAll(@Query() filters: FilterEnrollmentDto) {
-    return this.enrollmentsService.findAll(filters);
+  findAll(@Query() query: EnrollmentsQueryDto) {
+    return this.enrollmentsService.findAll(query);
   }
 
   @Get('courses/:courseId/enrollments')

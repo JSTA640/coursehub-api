@@ -49,7 +49,7 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `PATCH` | `/students/:id/status` | Cambia el estado activo. | `{ "isActive": false }` |
 | `DELETE` | `/students/:id` | Elimina estudiante activo sin matrículas. | ID de estudiante |
 | `POST` | `/enrollments` | Crea matrícula. | `{ "studentId": 1, "courseId": 1 }` |
-| `GET` | `/enrollments` | Lista matrículas con estudiante y curso. | `studentId` y `courseId` opcionales y combinables |
+| `GET` | `/enrollments` | Busca y pagina matrículas incluyendo estudiante y curso. | `search`, `studentId`, `courseId`, `activeOnly`, `page`, `limit` |
 | `GET` | `/students/:studentId/enrollments` | Lista matrículas del estudiante. | ID de estudiante |
 | `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso |
 | `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
@@ -79,6 +79,18 @@ claves foráneas. La base de datos impide repetir la pareja estudiante–curso y
 servicio verifica los duplicados antes de guardar. Los listados cargan las dos
 entidades relacionadas. Para crear una matrícula, el estudiante y el curso
 deben existir, y el estudiante debe estar activo.
+
+`GET /enrollments` responde `{ items, meta }`. `page` inicia en `1` y `limit`
+en `10` (máximo `50`). Los filtros opcionales `studentId` y `courseId` se
+combinan; `activeOnly=true` limita a matrículas de estudiantes activos.
+`search` busca sin distinguir mayúsculas en nombre del estudiante y título del
+curso. La búsqueda se parametriza en la consulta y los resultados se ordenan
+por ID de matrícula ascendente. Una colección sin coincidencias responde `200`
+con `items: []` y `meta.total: 0`. Ejemplo:
+
+```http
+GET /enrollments?search=nest&activeOnly=true&page=1&limit=5
+```
 
 | Estado | Situación |
 | --- | --- |
@@ -160,9 +172,9 @@ npm run test:cov
 ```
 
 Las pruebas unitarias ejercitan las reglas de los servicios (incluidos los
-conflictos concurrentes y los errores de recursos inexistentes). La secuencia
-anterior verifica los siete casos requeridos contra PostgreSQL, incluida la
-persistencia después de reiniciar.
+conflictos concurrentes, el filtrado y la paginación). Las pruebas E2E verifican
+los endpoints y sus validaciones contra PostgreSQL, incluida la persistencia
+después de reiniciar y las búsquedas sin coincidencias.
 
 ## Estructura principal
 

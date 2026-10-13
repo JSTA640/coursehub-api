@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateEnrollmentDto } from './dto/create-Enrollment.dto.js';
+import { EnrollmentsQueryDto } from './dto/enrollments-query.dto.js';
 import { Enrollment } from './entities/enrollment.entity.js';
 import { Student } from '../students/entities/student.entity.js';
 import { Course } from '../courses/entities/course.entity.js';
@@ -55,18 +56,43 @@ export class EnrollmentsService {
     }
   }
 
-  findAll(filter: { studentId?: number; courseId?: number } = {}): Promise<Enrollment[]> {
-    const where: {
-      student?: { id: number };
-      course?: { id: number };
-    } = {};
-    if (filter.studentId !== undefined) where.student = { id: filter.studentId };
-    if (filter.courseId !== undefined) where.course = { id: filter.courseId };
-    return this.enrollmentsRepository.find({
-      where,
-      relations: { student: true, course: true },
-      order: { id: 'ASC' },
-    });
+  async findAll(query: EnrollmentsQueryDto) {
+    const queryBuilder = this.enrollmentsRepository
+      .createQueryBuilder('enrollment')
+      .leftJoinAndSelect('enrollment.student', 'student')
+      .leftJoinAndSelect('enrollment.course', 'course');
+    const search = query.search?.trim();
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(student.name ILIKE :search OR course.title ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+    if (query.studentId !== undefined) {
+      queryBuilder.andWhere('student.id = :studentId', { studentId: query.studentId });
+    }
+    if (query.courseId !== undefined) {
+      queryBuilder.andWhere('course.id = :courseId', { courseId: query.courseId });
+    }
+    if (query.activeOnly === 'true') {
+      queryBuilder.andWhere('student.isActive = :active', { active: true });
+    }
+
+    const [items, total] = await queryBuilder
+      .orderBy('enrollment.id', 'ASC')
+      .skip((query.page - 1) * query.limit)
+      .take(query.limit)
+      .getManyAndCount();
+
+    return {
+      items,
+      meta: {
+        total,
+        page: query.page,
+        limit: query.limit,
+      },
+    };
   }
 
   async findByStudent(studentId: number): Promise<Enrollment[]> {

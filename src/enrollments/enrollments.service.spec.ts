@@ -11,18 +11,36 @@ describe('EnrollmentsService', () => {
   let service: EnrollmentsService;
   let repository: {
     create: jest.Mock;
+    createQueryBuilder: jest.Mock;
     find: jest.Mock;
     findOne: jest.Mock;
     findOneBy: jest.Mock;
     remove: jest.Mock;
     save: jest.Mock;
   };
+  let queryBuilder: {
+    andWhere: jest.Mock;
+    getManyAndCount: jest.Mock;
+    leftJoinAndSelect: jest.Mock;
+    orderBy: jest.Mock;
+    skip: jest.Mock;
+    take: jest.Mock;
+  };
   let studentsRepository: { findOneBy: jest.Mock };
   let coursesRepository: { findOneBy: jest.Mock };
 
   beforeEach(async () => {
+    queryBuilder = {
+      andWhere: jest.fn().mockReturnThis(),
+      getManyAndCount: jest.fn(),
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+    };
     repository = {
       create: jest.fn((enrollment) => enrollment),
+      createQueryBuilder: jest.fn(() => queryBuilder),
       find: jest.fn(),
       findOne: jest.fn(),
       findOneBy: jest.fn(),
@@ -106,16 +124,60 @@ describe('EnrollmentsService', () => {
       .rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('lists using combined filters and loads both related entities', async () => {
-    repository.find.mockResolvedValue([]);
+  it('paginates enrollments using combined filters and eagerly loads both relations', async () => {
+    const enrollmentPage = [{ id: 8, student: { id: 1 }, course: { id: 2 } }];
+    queryBuilder.getManyAndCount.mockResolvedValue([enrollmentPage, 6]);
 
-    await service.findAll({ studentId: 1, courseId: 2 });
-
-    expect(repository.find).toHaveBeenCalledWith({
-      where: { student: { id: 1 }, course: { id: 2 } },
-      relations: { student: true, course: true },
-      order: { id: 'ASC' },
+    await expect(service.findAll({
+      search: ' Nest ',
+      studentId: 1,
+      courseId: 2,
+      activeOnly: 'true',
+      page: 2,
+      limit: 5,
+    })).resolves.toEqual({
+      items: enrollmentPage,
+      meta: { total: 6, page: 2, limit: 5 },
     });
+    expect(repository.createQueryBuilder).toHaveBeenCalledWith('enrollment');
+    expect(queryBuilder.leftJoinAndSelect).toHaveBeenNthCalledWith(
+      1,
+      'enrollment.student',
+      'student',
+    );
+    expect(queryBuilder.leftJoinAndSelect).toHaveBeenNthCalledWith(
+      2,
+      'enrollment.course',
+      'course',
+    );
+    expect(queryBuilder.andWhere.mock.calls).toEqual([
+      [
+        '(student.name ILIKE :search OR course.title ILIKE :search)',
+        { search: '%Nest%' },
+      ],
+      ['student.id = :studentId', { studentId: 1 }],
+      ['course.id = :courseId', { courseId: 2 }],
+      ['student.isActive = :active', { active: true }],
+    ]);
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith('enrollment.id', 'ASC');
+    expect(queryBuilder.skip).toHaveBeenCalledWith(5);
+    expect(queryBuilder.take).toHaveBeenCalledWith(5);
+  });
+
+  it('treats false activeOnly as no active filter and returns empty pages successfully', async () => {
+    queryBuilder.getManyAndCount.mockResolvedValue([[], 0]);
+
+    await expect(service.findAll({
+      activeOnly: 'false',
+      page: 1,
+      limit: 10,
+    })).resolves.toEqual({
+      items: [],
+      meta: { total: 0, page: 1, limit: 10 },
+    });
+    expect(queryBuilder.andWhere).not.toHaveBeenCalled();
+    expect(queryBuilder.skip).toHaveBeenCalledWith(0);
+    expect(queryBuilder.take).toHaveBeenCalledWith(10);
   });
 
   it('validates resources and loads relations in per-resource listings', async () => {
