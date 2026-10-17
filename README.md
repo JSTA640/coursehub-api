@@ -13,10 +13,45 @@ npm install
 Copy-Item .env.example .env
 ```
 
-Configura en `.env` los valores de conexión de tu PostgreSQL local. No publiques
-ese archivo: las variables necesarias aparecen sin credenciales reales en
-`.env.example`. En `NODE_ENV=development`, TypeORM sincroniza las entidades para
-esta práctica. La sincronización queda desactivada en cualquier otro entorno.
+Configura en `.env` los valores de conexión de tu PostgreSQL local (crea antes
+la base indicada en `DB_NAME`).
+
+> **Advertencia:** `.env` contiene credenciales reales, está en `.gitignore` y
+> **no se comparte ni se entrega**. Solo `.env.example` (con valores ficticios)
+> forma parte del repositorio.
+
+## Variables de entorno
+
+Todas se validan con Joi al iniciar ([env.validation.ts](src/config/env.validation.ts)).
+Si falta una obligatoria o tiene un valor inválido, la API se detiene con un
+mensaje que nombra la variable.
+
+| Variable | Obligatoria | Valor por defecto | Descripción |
+| --- | --- | --- | --- |
+| `NODE_ENV` | No | `development` | `development`, `test` o `production`. |
+| `PORT` | No | `3000` | Puerto HTTP de la API. |
+| `DB_HOST` | Sí | — | Host de PostgreSQL. |
+| `DB_PORT` | No | `5432` | Puerto de PostgreSQL. |
+| `DB_NAME` | Sí | — | Nombre de la base de datos. |
+| `DB_USER` | Sí | — | Usuario de PostgreSQL. |
+| `DB_PASSWORD` | Sí | — | Contraseña (vacía solo fuera de producción). |
+| `LOG_LEVEL` | No | `log` | `debug`, `log`, `warn` o `error`. |
+
+## Ambientes
+
+La conexión se construye en [typeorm.config.ts](src/config/typeorm.config.ts)
+con `TypeOrmModule.forRootAsync` y `ConfigService`; no hay host, usuario ni
+contraseña escritos en TypeScript.
+
+| Decisión | Desarrollo | Producción |
+| --- | --- | --- |
+| Fuente de valores | `.env` local | Variables seguras del entorno de despliegue |
+| `synchronize` | `true` (solo con `NODE_ENV=development`) | `false` |
+| Cambios de esquema | Ajuste local desechable | Migraciones revisadas |
+
+Al iniciar se registra una línea sin secretos, por ejemplo
+`[TypeORM] env=production host=localhost port=5432 db=coursehub synchronize=false`.
+Nunca se registran el usuario ni la contraseña.
 
 ## Ejecución
 
@@ -29,7 +64,8 @@ npm run build
 npm run start:prod
 ```
 
-La API queda disponible en `http://localhost:3000`. Los módulos de cursos,
+La API queda disponible en `http://localhost:<PORT>` (por defecto
+`http://localhost:3000`; los ejemplos usan ese puerto). Los módulos de cursos,
 estudiantes y matrículas usan la misma conexión PostgreSQL; estudiantes y
 matrículas permanecen almacenados tras reiniciar la API.
 
@@ -184,6 +220,10 @@ src/
   students/
   enrollments/
   common/pipes/parse-id.pipe.ts
+  config/
+    env.validation.ts
+    logger.config.ts
+    typeorm.config.ts
   app.module.ts
   main.ts
 ```
