@@ -89,6 +89,17 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `GET` | `/students/:studentId/enrollments` | Lista matrículas del estudiante. | ID de estudiante |
 | `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso |
 | `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
+| `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` |
+
+## Registro de usuarios
+
+`POST /auth/register` crea una cuenta (`User`, tabla `users`) y responde `201`
+con `{ id, email, createdAt }`. El correo se limpia y pasa a minúsculas; la
+contraseña debe tener entre 8 y 72 caracteres y se transforma con bcrypt
+(12 rondas) antes de guardarse en `password_hash`. Ni la contraseña ni el hash
+aparecen en respuestas o registros. Un correo repetido responde `409` y una
+entrada inválida `400`. `User` es independiente de `Student`. Detalle y
+evidencias en [docs/sesion-15-registro.md](docs/sesion-15-registro.md).
 
 ## Persistencia, reglas y respuestas
 
@@ -219,6 +230,8 @@ src/
   courses/
   students/
   enrollments/
+  users/
+  auth/
   common/pipes/parse-id.pipe.ts
   config/
     env.validation.ts

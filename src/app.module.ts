@@ -8,6 +8,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CourseModule } from './courses/course.module.js';
 import { EnrollmentsModule } from './enrollments/enrollments.module.js';
 import { StudentsModule } from './students/students.module.js';
+import { UsersModule } from './users/users.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { envValidationSchema } from './config/env.validation.js';
 import { buildTypeOrmOptions } from './config/typeorm.config.js';
 
@@ -25,6 +27,8 @@ import { buildTypeOrmOptions } from './config/typeorm.config.js';
     CourseModule,
     EnrollmentsModule,
     StudentsModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController, WelcomeController],
   providers: [AppService, WelcomeService],
