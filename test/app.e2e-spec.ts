@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module.js';
 import { Course } from '../src/courses/entities/course.entity.js';
 import { Enrollment } from '../src/enrollments/entities/enrollment.entity.js';
 import { Student } from '../src/students/entities/student.entity.js';
+import { User } from '../src/users/entities/user.entity.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App> | undefined;
@@ -14,6 +15,7 @@ describe('AppController (e2e)', () => {
   let otherStudentId: number | undefined;
   let enrollmentId: number | undefined;
   let otherEnrollmentId: number | undefined;
+  let userId: number | undefined;
   let courseIds: number[] = [];
 
   async function createApp(): Promise<INestApplication<App>> {
@@ -34,8 +36,54 @@ describe('AppController (e2e)', () => {
     otherStudentId = undefined;
     enrollmentId = undefined;
     otherEnrollmentId = undefined;
+    userId = undefined;
     courseIds = [];
     app = await createApp();
+  });
+
+  it('registers and authenticates accounts without exposing credentials', async () => {
+    const server = app!.getHttpServer();
+    const email = `auth-e2e-${Date.now()}-${process.pid}@example.edu`;
+    const password = 'practice-password-2026';
+
+    const registration = await request(server)
+      .post('/auth/register')
+      .send({ email, password })
+      .expect(201);
+    userId = registration.body.id;
+    expect(registration.body).toEqual({
+      id: userId,
+      email,
+      createdAt: expect.any(String),
+    });
+    expect(registration.text).not.toContain('password');
+
+    await request(server)
+      .post('/auth/register')
+      .send({ email: ` ${email.toUpperCase()} `, password })
+      .expect(409);
+
+    const login = await request(server)
+      .post('/auth/login')
+      .send({ email: ` ${email.toUpperCase()} `, password })
+      .expect(200);
+    expect(login.body).toEqual(registration.body);
+    expect(login.text).not.toContain('password');
+
+    const incorrectPassword = await request(server)
+      .post('/auth/login')
+      .send({ email, password: 'different-practice-password' })
+      .expect(401);
+    const unknownEmail = await request(server)
+      .post('/auth/login')
+      .send({ email: `unknown-${email}`, password })
+      .expect(401);
+    expect(unknownEmail.body).toEqual(incorrectPassword.body);
+
+    await request(server)
+      .post('/auth/login')
+      .send({ email: 'not-an-email', password: 'short' })
+      .expect(400);
   });
 
   it('/ (GET)', () => {
@@ -335,6 +383,9 @@ describe('AppController (e2e)', () => {
       }
       if (otherStudentId !== undefined) {
         await dataSource.getRepository(Student).delete(otherStudentId);
+      }
+      if (userId !== undefined) {
+        await dataSource.getRepository(User).delete(userId);
       }
       if (courseIds.length > 0) {
         await dataSource.getRepository(Course).delete(courseIds);

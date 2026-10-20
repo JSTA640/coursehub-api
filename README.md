@@ -90,6 +90,7 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso |
 | `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
 | `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` |
+| `POST` | `/auth/login` | Comprueba las credenciales y responde con datos seguros de la cuenta. | `{ "email": "ana@example.com", "password": "…" }` |
 
 ## Registro de usuarios
 
@@ -100,6 +101,13 @@ contraseña debe tener entre 8 y 72 caracteres y se transforma con bcrypt
 aparecen en respuestas o registros. Un correo repetido responde `409` y una
 entrada inválida `400`. `User` es independiente de `Student`. Detalle y
 evidencias en [docs/sesion-15-registro.md](docs/sesion-15-registro.md).
+
+`POST /auth/login` compara la contraseña recibida con el hash persistido usando
+`bcrypt.compare` y responde `200` con `{ id, email, createdAt }` cuando coincide.
+Una cuenta inexistente o una contraseña incorrecta responde `401` con el mismo
+mensaje genérico; una entrada inválida responde `400`. Este flujo autentica al
+usuario, pero todavía no genera tokens ni implementa autorización por roles o
+permisos.
 
 ## Persistencia, reglas y respuestas
 
