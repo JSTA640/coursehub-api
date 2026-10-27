@@ -36,6 +36,8 @@ mensaje que nombra la variable.
 | `DB_USER` | Sí | — | Usuario de PostgreSQL. |
 | `DB_PASSWORD` | Sí | — | Contraseña (vacía solo fuera de producción). |
 | `LOG_LEVEL` | No | `log` | `debug`, `log`, `warn` o `error`. |
+| `JWT_SECRET` | Sí | — | Secreto aleatorio de al menos 32 caracteres; solo en `.env` o el entorno seguro. |
+| `JWT_EXPIRES_IN` | No | `15m` | Duración del token de acceso; unidades admitidas: `ms`, `s`, `m`, `h`, `d`, `w`, `y`. |
 
 ## Ambientes
 
@@ -90,7 +92,7 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso |
 | `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
 | `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` |
-| `POST` | `/auth/login` | Comprueba las credenciales y responde con datos seguros de la cuenta. | `{ "email": "ana@example.com", "password": "…" }` |
+| `POST` | `/auth/login` | Comprueba las credenciales y emite un token de acceso. | `{ "email": "ana@example.com", "password": "…" }` |
 
 ## Registro de usuarios
 
@@ -103,11 +105,14 @@ entrada inválida `400`. `User` es independiente de `Student`. Detalle y
 evidencias en [docs/sesion-15-registro.md](docs/sesion-15-registro.md).
 
 `POST /auth/login` compara la contraseña recibida con el hash persistido usando
-`bcrypt.compare` y responde `200` con `{ id, email, createdAt }` cuando coincide.
-Una cuenta inexistente o una contraseña incorrecta responde `401` con el mismo
-mensaje genérico; una entrada inválida responde `400`. Este flujo autentica al
-usuario, pero todavía no genera tokens ni implementa autorización por roles o
-permisos.
+`bcrypt.compare` y, si coincide, responde `200` con `{ accessToken, user }`.
+El token es un JWT firmado cuya carga contiene únicamente `sub` (ID) y `email`;
+incluye también `iat` y `exp`. Su vencimiento predeterminado es de 15 minutos.
+El payload de un JWT está firmado, no cifrado: no publiques ni compartas el
+token y no incluyas secretos en él. Una cuenta inexistente o una contraseña
+incorrecta responde `401` con el mismo mensaje genérico; una entrada inválida
+responde `400`. Emitir un token no implementa por sí solo autorización por
+roles o permisos.
 
 ## Persistencia, reglas y respuestas
 

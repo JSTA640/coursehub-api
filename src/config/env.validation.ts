@@ -20,4 +20,8 @@ export const envValidationSchema = Joi.object({
   LOG_LEVEL: Joi.string()
     .valid(...LOG_LEVELS)
     .default('log'),
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_EXPIRES_IN: Joi.string()
+    .pattern(/^[1-9]\d*(?:ms|s|m|h|d|w|y)$/)
+    .default('15m'),
 });
