@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
+import { PassportModule } from '@nestjs/passport';
 import { CoursesController } from './courses.controller.js';
 import { CoursesService } from './courses.service.js';
 import { CoursesQueryDto } from './dto/courses-query.dto.js';
@@ -23,6 +24,7 @@ describe('CoursesController', () => {
       remove: jest.fn(),
     };
     const module: TestingModule = await Test.createTestingModule({
+      imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
       controllers: [CoursesController],
       providers: [{ provide: CoursesService, useValue: coursesService }],
     }).compile();

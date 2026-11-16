@@ -73,26 +73,27 @@ matrículas permanecen almacenados tras reiniciar la API.
 
 ## Endpoints
 
-| Método | Ruta | Descripción | Parámetros / body |
-| --- | --- | --- | --- |
-| `POST` | `/courses` | Crea un curso. | `{ "title": "Bases de datos", "level": "Inicial" }` |
-| `GET` | `/courses` | Lista cursos con paginación y orden estable. | `level`, `page`, `limit`, `sortBy`, `order` opcionales |
-| `GET` | `/courses/:id` | Consulta curso. | ID positivo |
-| `PATCH` | `/courses/:id` | Modifica curso. | Body parcial de curso |
-| `DELETE` | `/courses/:id` | Elimina curso sin matrículas. | ID positivo |
-| `POST` | `/students` | Crea estudiante. | `name`, `email`, `age`, `career`, `semester`; `isActive` opcional |
-| `GET` | `/students` | Lista estudiantes. | Filtros opcionales combinables: `career`, `semester`, `isActive` |
-| `GET` | `/students/:id` | Consulta estudiante. | ID de estudiante |
-| `PATCH` | `/students/:id` | Modifica estudiante. | Body parcial validado por `UpdateStudentDto` |
-| `PATCH` | `/students/:id/status` | Cambia el estado activo. | `{ "isActive": false }` |
-| `DELETE` | `/students/:id` | Elimina estudiante activo sin matrículas. | ID de estudiante |
-| `POST` | `/enrollments` | Crea matrícula. | `{ "studentId": 1, "courseId": 1 }` |
-| `GET` | `/enrollments` | Busca y pagina matrículas incluyendo estudiante y curso. | `search`, `studentId`, `courseId`, `activeOnly`, `page`, `limit` |
-| `GET` | `/students/:studentId/enrollments` | Lista matrículas del estudiante. | ID de estudiante |
-| `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso |
-| `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula |
-| `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` |
-| `POST` | `/auth/login` | Comprueba las credenciales y emite un token de acceso. | `{ "email": "ana@example.com", "password": "…" }` |
+| Método | Ruta | Descripción | Parámetros / body | Acceso |
+| --- | --- | --- | --- | --- |
+| `POST` | `/courses` | Crea un curso. | `{ "title": "Bases de datos", "level": "beginner" }` | JWT |
+| `GET` | `/courses` | Lista cursos con paginación y orden estable. | `level`, `page`, `limit`, `sortBy`, `order` opcionales | Público |
+| `GET` | `/courses/:id` | Consulta curso. | ID positivo | Público |
+| `PATCH` | `/courses/:id` | Modifica curso. | Body parcial de curso | Público |
+| `DELETE` | `/courses/:id` | Elimina curso sin matrículas. | ID positivo | Público |
+| `POST` | `/students` | Crea estudiante. | `name`, `email`, `age`, `career`, `semester`; `isActive` opcional | Público |
+| `GET` | `/students` | Lista estudiantes. | Filtros opcionales combinables: `career`, `semester`, `isActive` | Público |
+| `GET` | `/students/:id` | Consulta estudiante. | ID de estudiante | Público |
+| `PATCH` | `/students/:id` | Modifica estudiante. | Body parcial validado por `UpdateStudentDto` | Público |
+| `PATCH` | `/students/:id/status` | Cambia el estado activo. | `{ "isActive": false }` | Público |
+| `DELETE` | `/students/:id` | Elimina estudiante activo sin matrículas. | ID de estudiante | Público |
+| `POST` | `/enrollments` | Crea matrícula. | `{ "studentId": 1, "courseId": 1 }` | Público |
+| `GET` | `/enrollments` | Busca y pagina matrículas incluyendo estudiante y curso. | `search`, `studentId`, `courseId`, `activeOnly`, `page`, `limit` | Público |
+| `GET` | `/students/:studentId/enrollments` | Lista matrículas del estudiante. | ID de estudiante | Público |
+| `GET` | `/courses/:courseId/enrollments` | Lista matrículas del curso. | ID de curso | Público |
+| `DELETE` | `/enrollments/:id` | Cancela matrícula. | ID de matrícula | Público |
+| `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` | Público |
+| `POST` | `/auth/login` | Comprueba las credenciales y emite un token de acceso. | `{ "email": "ana@example.com", "password": "…" }` | Público |
+| `GET` | `/auth/me` | Devuelve la identidad del token autenticado. | — | JWT |
 
 ## Registro de usuarios
 
@@ -113,6 +114,17 @@ token y no incluyas secretos en él. Una cuenta inexistente o una contraseña
 incorrecta responde `401` con el mismo mensaje genérico; una entrada inválida
 responde `400`. Emitir un token no implementa por sí solo autorización por
 roles o permisos.
+
+## Protección de rutas con JWT
+
+`JwtStrategy` de Passport extrae el token del encabezado
+`Authorization: Bearer <token>`, verifica firma y expiración y prepara en
+`request.user` únicamente `{ id, email }`. `JwtAuthGuard` aplica esa estrategia
+en las rutas marcadas explícitamente. `GET /auth/me` y `POST /courses` requieren
+un JWT; sin credencial, con una credencial alterada o expirada responden `401`
+antes de ejecutar el controlador. El registro, el login y las demás rutas aún
+no protegidas permanecen públicas en esta etapa. No se implementan roles ni
+permisos: autenticación válida no implica autorización para todas las acciones.
 
 ## Persistencia, reglas y respuestas
 
