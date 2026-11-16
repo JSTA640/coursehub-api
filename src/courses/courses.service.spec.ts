@@ -1,4 +1,3 @@
-import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -82,11 +81,9 @@ describe('CoursesService', () => {
     });
   });
 
-  describe('ownership', () => {
-    const admin: AuthenticatedUser = { id: 1, email: 'admin@example.com', role: UserRole.ADMIN };
+  // La regla de edición vive ahora en UpdateCourseUseCase (ver su spec).
+  describe('ownership on create', () => {
     const owner: AuthenticatedUser = { id: 2, email: 'docente@example.com', role: UserRole.TEACHER };
-    const otherTeacher: AuthenticatedUser = { id: 3, email: 'otro@example.com', role: UserRole.TEACHER };
-    const existing = () => ({ id: 10, title: 'Databases', level: 'beginner', createdByUserId: owner.id });
 
     it('stores the authenticated user as owner on create', async () => {
       await service.create({ title: 'Databases', level: 'beginner' }, owner);
@@ -96,36 +93,6 @@ describe('CoursesService', () => {
         level: 'beginner',
         createdByUserId: owner.id,
       });
-    });
-
-    it('lets the owning teacher update the course', async () => {
-      repository.findOneBy.mockResolvedValue(existing());
-
-      await expect(service.update(10, { title: 'SQL' }, owner)).resolves.toMatchObject({ title: 'SQL' });
-      expect(repository.save).toHaveBeenCalled();
-    });
-
-    it('lets an admin update any course', async () => {
-      repository.findOneBy.mockResolvedValue(existing());
-
-      await expect(service.update(10, { title: 'SQL' }, admin)).resolves.toMatchObject({ title: 'SQL' });
-    });
-
-    it('forbids a teacher who does not own the course and does not save', async () => {
-      repository.findOneBy.mockResolvedValue(existing());
-
-      await expect(service.update(10, { title: 'SQL' }, otherTeacher)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-      expect(repository.save).not.toHaveBeenCalled();
-    });
-
-    it('forbids teachers on legacy courses without an owner', async () => {
-      repository.findOneBy.mockResolvedValue({ ...existing(), createdByUserId: null });
-
-      await expect(service.update(10, { title: 'SQL' }, owner)).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
     });
   });
 });

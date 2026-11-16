@@ -3,6 +3,7 @@ import { jest } from '@jest/globals';
 import { PassportModule } from '@nestjs/passport';
 import { CoursesController } from './courses.controller.js';
 import { CoursesService } from './courses.service.js';
+import { UpdateCourseUseCase } from './application/use-cases/update-course.use-case.js';
 import { CoursesQueryDto } from './dto/courses-query.dto.js';
 
 describe('CoursesController', () => {
@@ -26,7 +27,10 @@ describe('CoursesController', () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
       controllers: [CoursesController],
-      providers: [{ provide: CoursesService, useValue: coursesService }],
+      providers: [
+        { provide: CoursesService, useValue: coursesService },
+        { provide: UpdateCourseUseCase, useValue: { execute: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get<CoursesController>(CoursesController);

@@ -16,7 +16,7 @@
 | Claims del JWT | `src/auth/auth.service.ts`, `src/auth/strategies/jwt.strategy.ts` | El token firma `{ sub, email, role }`; la estrategia rechaza (`401`) un rol ausente o desconocido. |
 | `@Roles()` | `src/auth/decorators/roles.decorator.ts` | Declara la política junto a la ruta; no concede nada por sí solo. |
 | `RolesGuard` | `src/auth/guards/roles.guard.ts` | Lee la metadata y compara con `request.user.role`. Va **después** de `JwtAuthGuard`. |
-| Propiedad | `src/courses/courses.service.ts` (`update`) | `admin` o `course.createdByUserId === actor.id`; si no, `ForbiddenException`. |
+| Propiedad | `src/courses/courses.service.ts` (`update`); desde la Sesión 22, `UpdateCourseUseCase` | `admin` o `course.createdByUserId === actor.id`; si no, `ForbiddenException`. |
 | Propietario | `Course.createdByUserId` | Se asigna en `create` desde `request.user.id`. El DTO no lo admite. |
 
 Política aplicada en `CoursesController`:

@@ -136,7 +136,7 @@ las rutas de escritura de cursos aplican tres capas, en este orden:
 
 1. `JwtAuthGuard` — identidad. Sin token, token alterado o expirado → `401`.
 2. `RolesGuard` + `@Roles(...)` — permiso por rol. Rol no incluido → `403`.
-3. `CoursesService.update` — propiedad. Un `teacher` solo modifica cursos cuyo
+3. `UpdateCourseUseCase` — propiedad. Un `teacher` solo modifica cursos cuyo
    `createdByUserId` coincide con su `id`; si no → `403`. `admin` gestiona cualquiera.
 
 `User.role` es una enumeración cerrada (`admin`, `teacher`, `student`) con valor
@@ -248,6 +248,35 @@ registro interno, enlazadas por el mismo `requestId`. Los registros **nunca**
 incluyen `Authorization`, tokens, contraseñas, cuerpos de petición ni la query
 string. Detalle y cierre en
 [docs/sesion-21-componentes-transversales.md](docs/sesion-21-componentes-transversales.md).
+
+## Casos de uso, repositorios y adaptadores (Sesión 22)
+
+La edición de cursos (`PATCH /courses/:id`) separa HTTP, regla de negocio y
+persistencia:
+
+```text
+CoursesController          ← conoce HTTP (guards, pipes, DTO)
+      ↓
+UpdateCourseUseCase        ← regla: solo el propietario o un admin puede editar
+      ↓
+CourseRepository (puerto)  ← contrato mínimo: findById, save
+      ↓
+TypeOrmCourseRepository    ← adaptador técnico (TypeORM)
+      ↓
+PostgreSQL
+```
+
+| Pieza | Archivo |
+| --- | --- |
+| Puerto + token `COURSE_REPOSITORY` | `src/courses/application/ports/course.repository.ts` |
+| Caso de uso | `src/courses/application/use-cases/update-course.use-case.ts` |
+| Adaptador TypeORM | `src/courses/infrastructure/typeorm-course.repository.ts` |
+| Registro `provide` / `useClass` | `src/courses/course.module.ts` |
+
+El contrato HTTP no cambió: mismos estados (`200`, `400`, `401`, `403`, `404`) y
+mismos mensajes. La regla se prueba con un repositorio en memoria, sin HTTP ni
+PostgreSQL. Detalle y cierre en
+[docs/sesion-22-casos-de-uso.md](docs/sesion-22-casos-de-uso.md).
 
 ## Persistencia, reglas y respuestas
 

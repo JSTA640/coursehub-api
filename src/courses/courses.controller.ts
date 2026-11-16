@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import type { AuthenticatedUser } from '../auth/types/jwt-payload.type.js';
 import { UserRole } from '../users/user-role.enum.js';
+import { UpdateCourseUseCase } from './application/use-cases/update-course.use-case.js';
 import { CoursesService } from './courses.service.js';
 import { createcourseDto } from './dto/create-courses.dto.js';
 import { CoursesQueryDto } from './dto/courses-query.dto.js';
@@ -26,7 +27,10 @@ type AuthenticatedRequest = Request & { user: AuthenticatedUser };
 
 @Controller('courses')
 export class CoursesController {
-  constructor(private readonly coursesService: CoursesService) {}
+  constructor(
+    private readonly coursesService: CoursesService,
+    private readonly updateCourse: UpdateCourseUseCase,
+  ) {}
 
   @Get()
   findAll(@Query() query: CoursesQueryDto) {
@@ -46,7 +50,8 @@ export class CoursesController {
     return this.coursesService.create(createCourseDto, request.user);
   }
 
-  // El rol filtra a admin/teacher; la propiedad se comprueba en el servicio.
+  // El controlador solo conoce HTTP: el rol filtra a admin/teacher y la regla de
+  // propiedad vive en UpdateCourseUseCase.
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.TEACHER)
@@ -55,7 +60,7 @@ export class CoursesController {
     @Body() dto: UpdateCourseDto,
     @Req() request: AuthenticatedRequest,
   ) {
-    return this.coursesService.update(id, dto, request.user);
+    return this.updateCourse.execute(id, dto, request.user);
   }
 
   @Delete(':id')

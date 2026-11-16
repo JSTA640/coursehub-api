@@ -12,6 +12,7 @@ import type { AuthenticatedUser } from '../auth/types/jwt-payload.type.js';
 import { UserRole } from '../users/user-role.enum.js';
 import { CoursesController } from './courses.controller.js';
 import { CoursesService } from './courses.service.js';
+import { UpdateCourseUseCase } from './application/use-cases/update-course.use-case.js';
 
 const JWT_SECRET = 'test-jwt-secret-that-is-at-least-thirty-two-characters';
 
@@ -31,9 +32,9 @@ describe('Courses authorization (roles + ownership)', () => {
   let app: INestApplication;
   let coursesService: {
     create: jest.Mock<AnyAsync>;
-    update: jest.Mock<AnyAsync>;
     remove: jest.Mock<AnyAsync>;
   };
+  let updateCourse: { execute: jest.Mock<AnyAsync> };
 
   const tokenFor = (user: AuthenticatedUser) =>
     jwtService.signAsync({ sub: user.id, email: user.email, role: user.role });
@@ -45,14 +46,16 @@ describe('Courses authorization (roles + ownership)', () => {
         ...(dto as object),
         createdByUserId: (actor as AuthenticatedUser).id,
       })),
-      update: jest.fn<AnyAsync>(async (_id, dto, actor) => {
+      remove: jest.fn<AnyAsync>(async () => course),
+    };
+    updateCourse = {
+      execute: jest.fn<AnyAsync>(async (_id, dto, actor) => {
         const user = actor as AuthenticatedUser;
         if (user.role !== UserRole.ADMIN && user.id !== course.createdByUserId) {
           throw new ForbiddenException('You cannot modify this course');
         }
         return { ...course, ...(dto as object) };
       }),
-      remove: jest.fn<AnyAsync>(async () => course),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -60,6 +63,7 @@ describe('Courses authorization (roles + ownership)', () => {
       controllers: [CoursesController],
       providers: [
         { provide: CoursesService, useValue: coursesService },
+        { provide: UpdateCourseUseCase, useValue: updateCourse },
         { provide: ConfigService, useValue: new ConfigService({ JWT_SECRET }) },
         JwtAuthGuard,
         RolesGuard,
@@ -137,19 +141,19 @@ describe('Courses authorization (roles + ownership)', () => {
 
     it('returns 401 without a token', async () => {
       expect((await send('patch', path, undefined, body)).status).toBe(401);
-      expect(coursesService.update).not.toHaveBeenCalled();
+      expect(updateCourse.execute).not.toHaveBeenCalled();
     });
 
     it('returns 403 for a student before reaching the service', async () => {
       expect((await send('patch', path, student, body)).status).toBe(403);
-      expect(coursesService.update).not.toHaveBeenCalled();
+      expect(updateCourse.execute).not.toHaveBeenCalled();
     });
 
     it('returns 403 for a teacher who does not own the course', async () => {
       const response = await send('patch', path, otherTeacher, body);
 
       expect(response.status).toBe(403);
-      expect(coursesService.update).toHaveBeenCalledWith(course.id, body, otherTeacher);
+      expect(updateCourse.execute).toHaveBeenCalledWith(course.id, body, otherTeacher);
     });
 
     it('returns 200 for the owning teacher', async () => {
@@ -167,7 +171,7 @@ describe('Courses authorization (roles + ownership)', () => {
       const response = await send('patch', path, otherTeacher, { createdByUserId: otherTeacher.id });
 
       expect(response.status).toBe(400);
-      expect(coursesService.update).not.toHaveBeenCalled();
+      expect(updateCourse.execute).not.toHaveBeenCalled();
     });
   });
 

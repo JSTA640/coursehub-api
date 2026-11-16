@@ -157,6 +157,16 @@ describe('AppController (e2e)', () => {
     const firstCourseId: number = firstCourseResponse.body.id;
     courseIds.push(firstCourseId);
 
+    // PATCH pasa por UpdateCourseUseCase y el adaptador TypeORM: mismo contrato HTTP.
+    const renamed = await request(server)
+      .patch(`/courses/${firstCourseId}`)
+      .set(auth)
+      .send({ title: `Curso prueba ${uniqueTag}` })
+      .expect(200);
+    expect(renamed.body).toMatchObject({ id: firstCourseId, title: `Curso prueba ${uniqueTag}` });
+    await request(server).patch('/courses/2147483647').set(auth).send({ title: 'x' }).expect(404);
+    await request(server).patch(`/courses/${firstCourseId}`).send({ title: 'x' }).expect(401);
+
     const paginationCourseTitles = [`Álgebra ${uniqueTag}`, `Biología ${uniqueTag}`,
       `Cálculo ${uniqueTag}`, `Diseño ${uniqueTag}`, `Estadística ${uniqueTag}`,
       `Física ${uniqueTag}`, `Geometría ${uniqueTag}`];
