@@ -24,4 +24,21 @@ describe('envValidationSchema', () => {
       envValidationSchema.validate({ ...validEnvironment, JWT_EXPIRES_IN: 'forever' }).error,
     ).toBeDefined();
   });
+
+  it('defaults CORS to the local client origin and rejects wildcards or paths', () => {
+    expect(envValidationSchema.validate(validEnvironment).value.CORS_ORIGINS).toBe(
+      'http://localhost:5173',
+    );
+    expect(
+      envValidationSchema.validate({
+        ...validEnvironment,
+        CORS_ORIGINS: 'http://localhost:5173, https://coursehub.example.edu',
+      }).error,
+    ).toBeUndefined();
+    for (const invalid of ['*', 'localhost:5173', 'http://localhost:5173/', 'http://a.test/app']) {
+      expect(
+        envValidationSchema.validate({ ...validEnvironment, CORS_ORIGINS: invalid }).error,
+      ).toBeDefined();
+    }
+  });
 });

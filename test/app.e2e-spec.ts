@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
@@ -8,6 +9,7 @@ import { Course } from '../src/courses/entities/course.entity.js';
 import { Enrollment } from '../src/enrollments/entities/enrollment.entity.js';
 import { Student } from '../src/students/entities/student.entity.js';
 import { User } from '../src/users/entities/user.entity.js';
+import { UserRole } from '../src/users/user-role.enum.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App> | undefined;
@@ -21,7 +23,12 @@ describe('AppController (e2e)', () => {
   async function createApp(): Promise<INestApplication<App>> {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // El límite de tasa tiene su propia prueba (auth.throttle.spec.ts); aquí
+      // se desactiva para que el flujo completo no reciba 429.
+      .overrideProvider(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     const application = moduleFixture.createNestApplication<App>();
     application.useGlobalPipes(
@@ -29,6 +36,20 @@ describe('AppController (e2e)', () => {
     );
     await application.init();
     return application;
+  }
+
+  // Cuenta de práctica con rol admin asignado directamente en la base de datos.
+  async function createAdminToken(server: App, tag: string): Promise<string> {
+    const email = `admin-e2e-${tag}@example.edu`;
+    const password = 'practice-password-2026';
+    const registration = await request(server)
+      .post('/auth/register')
+      .send({ email, password })
+      .expect(201);
+    userId = registration.body.id;
+    await app!.get(DataSource).getRepository(User).update(userId!, { role: UserRole.ADMIN });
+    const login = await request(server).post('/auth/login').send({ email, password }).expect(200);
+    return login.body.accessToken;
   }
 
   beforeEach(async () => {
@@ -54,6 +75,7 @@ describe('AppController (e2e)', () => {
     expect(registration.body).toEqual({
       id: userId,
       email,
+      role: UserRole.STUDENT,
       createdAt: expect.any(String),
     });
     expect(registration.text).not.toContain('password');
@@ -67,7 +89,7 @@ describe('AppController (e2e)', () => {
       .post('/auth/login')
       .send({ email: ` ${email.toUpperCase()} `, password })
       .expect(200);
-    expect(login.body).toEqual(registration.body);
+    expect(login.body).toEqual({ accessToken: expect.any(String), user: registration.body });
     expect(login.text).not.toContain('password');
 
     const incorrectPassword = await request(server)
@@ -98,9 +120,12 @@ describe('AppController (e2e)', () => {
     const uniqueTag = `${Date.now()}-${process.pid}`;
     const email = `e2e-${uniqueTag}@example.edu`;
     const career = `E2E-${uniqueTag}`;
+    const adminToken = await createAdminToken(server, uniqueTag);
+    const auth = { Authorization: `Bearer ${adminToken}` };
 
     const firstCourseResponse = await request(server)
       .post('/courses')
+      .set(auth)
       .send({ title: `Curso prueba ${uniqueTag}`, level: 'beginner' })
       .expect(201);
     const firstCourseId: number = firstCourseResponse.body.id;
@@ -112,6 +137,7 @@ describe('AppController (e2e)', () => {
     for (const title of paginationCourseTitles) {
       const response = await request(server)
         .post('/courses')
+        .set(auth)
         .send({ title, level: 'beginner' })
         .expect(201);
       courseIds.push(response.body.id);
@@ -119,6 +145,7 @@ describe('AppController (e2e)', () => {
 
     const secondCourseResponse = await request(server)
       .post('/courses')
+      .set(auth)
       .send({ title: `Otro curso ${uniqueTag}`, level: 'intermediate' })
       .expect(201);
     const secondCourseId: number = secondCourseResponse.body.id;
@@ -363,7 +390,7 @@ describe('AppController (e2e)', () => {
     otherStudentId = undefined;
 
     for (const courseId of courseIds) {
-      await request(app.getHttpServer()).delete(`/courses/${courseId}`).expect(200);
+      await request(app.getHttpServer()).delete(`/courses/${courseId}`).set(auth).expect(200);
     }
     courseIds = [];
   });

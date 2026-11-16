@@ -29,6 +29,7 @@ const config: Config = {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/test/jest.setup.ts'],
 };
 
 export default config;

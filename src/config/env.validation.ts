@@ -3,6 +3,9 @@ import Joi from 'joi';
 export const LOG_LEVELS = ['debug', 'log', 'warn', 'error'] as const;
 export type AppLogLevel = (typeof LOG_LEVELS)[number];
 
+// Esquema + host + puerto opcional, sin ruta ni barra final (formato del encabezado Origin).
+const ORIGIN_PATTERN = /^https?:\/\/[a-z0-9.-]+(?::\d{1,5})?$/i;
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().port().default(3000),
@@ -24,4 +27,13 @@ export const envValidationSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string()
     .pattern(/^[1-9]\d*(?:ms|s|m|h|d|w|y)$/)
     .default('15m'),
+  // Orígenes web permitidos, separados por comas. '*' no se admite: el cliente es conocido.
+  CORS_ORIGINS: Joi.string()
+    .custom((value: string, helpers) => {
+      const origins = value.split(',').map((origin) => origin.trim()).filter(Boolean);
+      const valid =
+        origins.length > 0 && origins.every((origin) => ORIGIN_PATTERN.test(origin));
+      return valid ? value : helpers.error('any.invalid');
+    })
+    .default('http://localhost:5173'),
 });

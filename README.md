@@ -38,6 +38,7 @@ mensaje que nombra la variable.
 | `LOG_LEVEL` | No | `log` | `debug`, `log`, `warn` o `error`. |
 | `JWT_SECRET` | Sí | — | Secreto aleatorio de al menos 32 caracteres; solo en `.env` o el entorno seguro. |
 | `JWT_EXPIRES_IN` | No | `15m` | Duración del token de acceso; unidades admitidas: `ms`, `s`, `m`, `h`, `d`, `w`, `y`. |
+| `CORS_ORIGINS` | No | `http://localhost:5173` | Orígenes web permitidos, separados por comas (`esquema://host[:puerto]`). No admite `*`. |
 
 ## Ambientes
 
@@ -167,6 +168,45 @@ UPDATE users SET role = 'teacher' WHERE email = 'docente@example.com';
 Los cursos creados antes de esta sesión tienen `created_by_user_id = NULL` y solo
 un `admin` puede modificarlos. Detalle y respuestas de cierre en
 [docs/sesion-19-autorizacion.md](docs/sesion-19-autorizacion.md).
+
+## Controles de seguridad para una API pública (Sesión 20)
+
+La API aplica **defensa en profundidad**: ninguna capa sustituye a otra.
+
+| Riesgo | Control principal | Control complementario |
+| --- | --- | --- |
+| Cuerpo malformado | DTO y `ValidationPipe` | Límite de tamaño de petición (100 kb por defecto en Express) |
+| Token robado en tránsito | HTTPS/TLS | Vencimiento corto del JWT (`15m`) |
+| Fuerza bruta de login | Rate limit (5/min) | Mensaje genérico `401` y hash bcrypt |
+| Acción sin permiso | Roles y propiedad | Registro de auditoría |
+| Sitio web no autorizado | CORS | JWT y autorización en el servidor |
+
+**CORS.** Se habilita en `main.ts` solo para los orígenes de `CORS_ORIGINS`, con
+métodos `GET, POST, PATCH, DELETE` y encabezados `Content-Type, Authorization`.
+CORS solo indica a un **navegador** qué sitios pueden leer las respuestas; no
+impide que Postman, un script o un servidor llamen a la API. Las rutas
+protegidas siguen exigiendo JWT aunque el origen esté permitido.
+
+**Rate limit.** `@nestjs/throttler` se aplica globalmente con 20 solicitudes por
+minuto por IP; `POST /auth/login` está limitado a **5 intentos por minuto**. Al
+superarlo la API responde `429 Too Many Requests` con un mensaje genérico y el
+encabezado `Retry-After`, sin indicar si el correo o la contraseña eran
+correctos. Los contadores viven en memoria: se reinician al reiniciar la API y no
+se comparten entre varias instancias.
+
+> **Reglas de despliegue**
+> - **Producción requiere HTTPS.** Sin TLS, un token Bearer puede interceptarse y
+>   reutilizarse aunque su firma sea válida. `http://localhost` solo se admite en
+>   desarrollo; en producción la terminación TLS se realiza en el proxy,
+>   balanceador o plataforma de despliegue.
+> - **Los secretos viven solo en el entorno** (`.env` local o variables seguras
+>   de la plataforma): `JWT_SECRET`, `DB_PASSWORD`, etc. Nunca en el código, el
+>   repositorio, los logs ni las respuestas.
+> - Detrás de un proxy, configura `trust proxy` para que el rate limit use la IP
+>   real del cliente y no la del proxy.
+
+Detalle y respuestas de cierre en
+[docs/sesion-20-seguridad.md](docs/sesion-20-seguridad.md).
 
 ## Persistencia, reglas y respuestas
 
