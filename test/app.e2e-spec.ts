@@ -100,12 +100,38 @@ describe('AppController (e2e)', () => {
       .post('/auth/login')
       .send({ email: `unknown-${email}`, password })
       .expect(401);
-    expect(unknownEmail.body).toEqual(incorrectPassword.body);
+    // Mismo error público (sin pistas sobre la cuenta); solo cambian timestamp y requestId.
+    const stable = ({ statusCode, error, message, path }: Record<string, unknown>) => ({
+      statusCode, error, message, path,
+    });
+    expect(stable(unknownEmail.body)).toEqual(stable(incorrectPassword.body));
 
     await request(server)
       .post('/auth/login')
       .send({ email: 'not-an-email', password: 'short' })
       .expect(400);
+  });
+
+  it('returns uniform public errors for 400, 404 and unexpected 500', async () => {
+    const server = app!.getHttpServer();
+
+    const badId = await request(server).get('/courses/abc').expect(400);
+    expect(badId.body).toMatchObject({ statusCode: 400, error: 'Bad Request', path: '/courses/abc' });
+
+    const missing = await request(server).get('/courses/2147483647').expect(404);
+    expect(missing.body).toMatchObject({ statusCode: 404, error: 'Not Found' });
+
+    const unexpected = await request(server).get('/diagnostics/unexpected-error').expect(500);
+    expect(unexpected.body).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      message: 'Internal server error',
+      path: '/diagnostics/unexpected-error',
+      timestamp: expect.any(String),
+      requestId: unexpected.headers['x-request-id'],
+    });
+    expect(unexpected.text).not.toMatch(/SELECT|password_hash|stack/);
+    expect(unexpected.headers['x-response-time']).toMatch(/^\d+ms$/);
   });
 
   it('/ (GET)', () => {

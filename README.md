@@ -95,6 +95,7 @@ matrículas permanecen almacenados tras reiniciar la API.
 | `POST` | `/auth/register` | Registra una cuenta de usuario. | `{ "email": "ana@example.com", "password": "…" }` | Público |
 | `POST` | `/auth/login` | Comprueba las credenciales y emite un token de acceso. | `{ "email": "ana@example.com", "password": "…" }` | Público |
 | `GET` | `/auth/me` | Devuelve la identidad del token autenticado. | — | JWT |
+| `GET` | `/diagnostics/unexpected-error` | Provoca un error inesperado de práctica (500 genérico). En producción responde `404`. | — | Público (solo desarrollo) |
 
 ## Registro de usuarios
 
@@ -207,6 +208,46 @@ se comparten entre varias instancias.
 
 Detalle y respuestas de cierre en
 [docs/sesion-20-seguridad.md](docs/sesion-20-seguridad.md).
+
+## Componentes transversales (Sesión 21)
+
+Cada preocupación transversal vive en un único componente global, sin
+`try/catch`, validaciones manuales ni logs repetidos en los controladores.
+
+Orden real de ejecución en NestJS:
+
+```text
+Solicitud → middleware → guard → interceptor (antes) → pipe → controlador → interceptor (después) → respuesta
+                                           ↘ filter si ocurre una excepción en cualquier etapa
+```
+
+| Componente | Archivo | Responsabilidad |
+| --- | --- | --- |
+| Middleware | `src/common/middleware/request-logger.middleware.ts` | Genera `X-Request-Id` y registra `method`, `path` (sin query), `status` y `durationMs` de cada solicitud. |
+| Guards | `JwtAuthGuard`, `RolesGuard`, `ThrottlerGuard` | Deciden si la solicitud continúa (401, 403, 429). |
+| Pipes | `ValidationPipe` global, `ParseIntPipe`, `ParseIdPipe` | Validan y transforman el cuerpo y los parámetros (400). |
+| Interceptor | `src/common/interceptors/timing.interceptor.ts` | Mide la duración del método, añade `X-Response-Time` y lo registra; no oculta errores. |
+| Filter | `src/common/filters/http-error.filter.ts` | Traduce cualquier excepción a la forma de error uniforme. |
+
+Forma pública de todos los errores:
+
+```json
+{
+  "statusCode": 404,
+  "error": "Not Found",
+  "message": "El curso con ID 99 no existe",
+  "path": "/courses/99",
+  "timestamp": "2026-11-16T15:04:05.000Z",
+  "requestId": "6f1c…"
+}
+```
+
+Un error inesperado responde siempre `500` con `"message": "Internal server error"`:
+la traza, las consultas SQL y las variables de entorno solo aparecen en el
+registro interno, enlazadas por el mismo `requestId`. Los registros **nunca**
+incluyen `Authorization`, tokens, contraseñas, cuerpos de petición ni la query
+string. Detalle y cierre en
+[docs/sesion-21-componentes-transversales.md](docs/sesion-21-componentes-transversales.md).
 
 ## Persistencia, reglas y respuestas
 
