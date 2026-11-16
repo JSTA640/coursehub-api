@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import type { AuthenticatedUser, JwtPayload } from '../types/jwt-payload.type.js';
+import { UserRole } from '../../users/user-role.enum.js';
+
+const VALID_ROLES = new Set<string>(Object.values(UserRole));
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -18,11 +21,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (
       typeof payload.sub !== 'number' ||
       typeof payload.email !== 'string' ||
-      payload.email.length === 0
+      payload.email.length === 0 ||
+      typeof payload.role !== 'string' ||
+      !VALID_ROLES.has(payload.role)
     ) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    return { id: payload.sub, email: payload.email };
+    return { id: payload.sub, email: payload.email, role: payload.role };
   }
 }

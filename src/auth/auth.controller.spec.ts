@@ -12,6 +12,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { UsersService } from '../users/users.service.js';
 import { User } from '../users/entities/user.entity.js';
+import { UserRole } from '../users/user-role.enum.js';
 
 describe('POST /auth/login', () => {
   const password = 'aprendo-nest-2026';
@@ -29,6 +30,7 @@ describe('POST /auth/login', () => {
       id: 1,
       email: userEmail,
       passwordHash: await bcrypt.hash(password, 4),
+      role: UserRole.STUDENT,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     };
   });
@@ -77,6 +79,7 @@ describe('POST /auth/login', () => {
       user: {
         id: user.id,
         email: user.email,
+        role: UserRole.STUDENT,
         createdAt: user.createdAt.toISOString(),
       },
     });
@@ -85,18 +88,29 @@ describe('POST /auth/login', () => {
     await expect(jwtService.verifyAsync(response.body.accessToken)).resolves.toMatchObject({
       sub: user.id,
       email: user.email,
+      role: UserRole.STUDENT,
     });
   });
 
   it('returns 200 for /auth/me with a valid Bearer token', async () => {
-    const token = await jwtService.signAsync({ sub: user.id, email: user.email });
+    const token = await jwtService.signAsync({ sub: user.id, email: user.email, role: user.role });
 
     const response = await request(app.getHttpServer())
       .get('/auth/me')
       .set('Authorization', `Bearer ${token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ id: user.id, email: user.email });
+    expect(response.body).toEqual({ id: user.id, email: user.email, role: UserRole.STUDENT });
+  });
+
+  it('returns 401 for /auth/me with a signed token that lacks a valid role', async () => {
+    const token = await jwtService.signAsync({ sub: user.id, email: user.email, role: 'superuser' });
+
+    const response = await request(app.getHttpServer())
+      .get('/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(401);
   });
 
   it('returns 401 for /auth/me without an Authorization header', async () => {
@@ -106,7 +120,7 @@ describe('POST /auth/login', () => {
   });
 
   it('returns 401 for /auth/me with a non-Bearer authorization scheme', async () => {
-    const token = await jwtService.signAsync({ sub: user.id, email: user.email });
+    const token = await jwtService.signAsync({ sub: user.id, email: user.email, role: user.role });
 
     const response = await request(app.getHttpServer())
       .get('/auth/me')
@@ -116,7 +130,7 @@ describe('POST /auth/login', () => {
   });
 
   it('returns 401 for /auth/me with an altered token', async () => {
-    const token = await jwtService.signAsync({ sub: user.id, email: user.email });
+    const token = await jwtService.signAsync({ sub: user.id, email: user.email, role: user.role });
     const alteredToken = `${token.slice(0, -1)}${token.endsWith('a') ? 'b' : 'a'}`;
 
     const response = await request(app.getHttpServer())
@@ -128,7 +142,7 @@ describe('POST /auth/login', () => {
 
   it('returns 401 for /auth/me with an expired token', async () => {
     const expiredToken = await jwtService.signAsync(
-      { sub: user.id, email: user.email },
+      { sub: user.id, email: user.email, role: user.role },
       { expiresIn: -1 },
     );
 

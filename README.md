@@ -75,11 +75,11 @@ matrículas permanecen almacenados tras reiniciar la API.
 
 | Método | Ruta | Descripción | Parámetros / body | Acceso |
 | --- | --- | --- | --- | --- |
-| `POST` | `/courses` | Crea un curso. | `{ "title": "Bases de datos", "level": "beginner" }` | JWT |
+| `POST` | `/courses` | Crea un curso; el propietario es el usuario autenticado. | `{ "title": "Bases de datos", "level": "beginner" }` | JWT · `admin`, `teacher` |
 | `GET` | `/courses` | Lista cursos con paginación y orden estable. | `level`, `page`, `limit`, `sortBy`, `order` opcionales | Público |
 | `GET` | `/courses/:id` | Consulta curso. | ID positivo | Público |
-| `PATCH` | `/courses/:id` | Modifica curso. | Body parcial de curso | Público |
-| `DELETE` | `/courses/:id` | Elimina curso sin matrículas. | ID positivo | Público |
+| `PATCH` | `/courses/:id` | Modifica curso. | Body parcial validado por `UpdateCourseDto` | JWT · `admin` o `teacher` propietario |
+| `DELETE` | `/courses/:id` | Elimina curso sin matrículas. | ID positivo | JWT · `admin` |
 | `POST` | `/students` | Crea estudiante. | `name`, `email`, `age`, `career`, `semester`; `isActive` opcional | Público |
 | `GET` | `/students` | Lista estudiantes. | Filtros opcionales combinables: `career`, `semester`, `isActive` | Público |
 | `GET` | `/students/:id` | Consulta estudiante. | ID de estudiante | Público |
@@ -107,24 +107,66 @@ evidencias en [docs/sesion-15-registro.md](docs/sesion-15-registro.md).
 
 `POST /auth/login` compara la contraseña recibida con el hash persistido usando
 `bcrypt.compare` y, si coincide, responde `200` con `{ accessToken, user }`.
-El token es un JWT firmado cuya carga contiene únicamente `sub` (ID) y `email`;
+El token es un JWT firmado cuya carga contiene únicamente `sub` (ID), `email` y `role`;
 incluye también `iat` y `exp`. Su vencimiento predeterminado es de 15 minutos.
 El payload de un JWT está firmado, no cifrado: no publiques ni compartas el
 token y no incluyas secretos en él. Una cuenta inexistente o una contraseña
 incorrecta responde `401` con el mismo mensaje genérico; una entrada inválida
-responde `400`. Emitir un token no implementa por sí solo autorización por
-roles o permisos.
+responde `400`. Emitir un token no implementa por sí solo autorización: ver
+[Roles, permisos y propiedad](#roles-permisos-y-propiedad-sesión-19).
 
 ## Protección de rutas con JWT
 
 `JwtStrategy` de Passport extrae el token del encabezado
 `Authorization: Bearer <token>`, verifica firma y expiración y prepara en
-`request.user` únicamente `{ id, email }`. `JwtAuthGuard` aplica esa estrategia
-en las rutas marcadas explícitamente. `GET /auth/me` y `POST /courses` requieren
-un JWT; sin credencial, con una credencial alterada o expirada responden `401`
+`request.user` únicamente `{ id, email, role }` (un token sin rol válido → `401`). `JwtAuthGuard` aplica esa estrategia
+en las rutas marcadas explícitamente. `GET /auth/me` y las rutas de escritura de
+cursos (`POST`, `PATCH`, `DELETE`) requieren un JWT; sin credencial, con una credencial alterada o expirada responden `401`
 antes de ejecutar el controlador. El registro, el login y las demás rutas aún
-no protegidas permanecen públicas en esta etapa. No se implementan roles ni
-permisos: autenticación válida no implica autorización para todas las acciones.
+no protegidas permanecen públicas en esta etapa. Autenticación válida no implica
+autorización para todas las acciones: los roles y la propiedad se describen en la
+sección siguiente.
+
+## Roles, permisos y propiedad (Sesión 19)
+
+Un JWT válido prueba **quién** hace la solicitud, no **qué** puede hacer. Por eso
+las rutas de escritura de cursos aplican tres capas, en este orden:
+
+1. `JwtAuthGuard` — identidad. Sin token, token alterado o expirado → `401`.
+2. `RolesGuard` + `@Roles(...)` — permiso por rol. Rol no incluido → `403`.
+3. `CoursesService.update` — propiedad. Un `teacher` solo modifica cursos cuyo
+   `createdByUserId` coincide con su `id`; si no → `403`. `admin` gestiona cualquiera.
+
+`User.role` es una enumeración cerrada (`admin`, `teacher`, `student`) con valor
+por defecto `student` (menor privilegio). `POST /auth/register` no acepta `role`:
+el `ValidationPipe` con `forbidNonWhitelisted` responde `400` si se envía.
+`Course.createdByUserId` se toma siempre de `request.user.id`; el cliente no
+puede enviarlo en `POST` ni en `PATCH` (`400`).
+
+| Acción | Sin token | `student` | `teacher` ajeno | `teacher` propietario | `admin` |
+| --- | --- | --- | --- | --- | --- |
+| `POST /courses` | 401 | 403 | 201 | 201 | 201 |
+| `PATCH /courses/:id` | 401 | 403 | 403 | 200 | 200 |
+| `DELETE /courses/:id` | 401 | 403 | 403 | 403 | 200 |
+
+**Identidad mínima autenticada:** el token y `request.user` contienen solo
+`{ id, email, role }`. `id` permite evaluar la propiedad y `role` el permiso;
+`email` se conserva para `/auth/me`. El rol viaja firmado en el JWT, así que un
+cambio de rol se aplica cuando la persona vuelve a iniciar sesión (como máximo
+`JWT_EXPIRES_IN`, 15 min por defecto).
+
+Asignación controlada de roles en la base **local** (después de registrar las
+cuentas de práctica con `POST /auth/register`; usa correos y contraseñas ficticios):
+
+```sql
+UPDATE users SET role = 'admin'   WHERE email = 'admin@example.com';
+UPDATE users SET role = 'teacher' WHERE email = 'docente@example.com';
+-- estudiante@example.com conserva el valor por defecto 'student'
+```
+
+Los cursos creados antes de esta sesión tienen `created_by_user_id = NULL` y solo
+un `admin` puede modificarlos. Detalle y respuestas de cierre en
+[docs/sesion-19-autorizacion.md](docs/sesion-19-autorizacion.md).
 
 ## Persistencia, reglas y respuestas
 

@@ -20,12 +20,13 @@ export class AuthService {
     const user = await this.usersService.create(dto.email, passwordHash);
 
     // Respuesta construida a mano: nunca incluye password ni passwordHash.
-    return { id: user.id, email: user.email, createdAt: user.createdAt };
+    return { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt };
   }
 
   async login(dto: LoginDto) {
     const user = await this.validateCredentials(dto.email, dto.password);
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+    // Claims mínimos para autorizar: id (propiedad) y role (permisos), sin secretos.
+    const payload: JwtPayload = { sub: user.id, email: user.email, role: user.role };
 
     return {
       accessToken: await this.jwtService.signAsync(payload),
@@ -41,6 +42,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return { id: user.id, email: user.email, createdAt: user.createdAt };
+    return { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt };
   }
 }

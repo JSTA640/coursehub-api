@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import { AuthService } from './auth.service.js';
 import { UsersService } from '../users/users.service.js';
 import { User } from '../users/entities/user.entity.js';
+import { UserRole } from '../users/user-role.enum.js';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -39,6 +40,7 @@ describe('AuthService', () => {
       id: 1,
       email,
       passwordHash,
+      role: UserRole.STUDENT,
       createdAt,
     }));
 
@@ -48,7 +50,7 @@ describe('AuthService', () => {
     expect(passwordHash).not.toBe('aprendo-nest-2026');
     expect(passwordHash).toMatch(/^\$2[aby]\$12\$/);
     await expect(bcrypt.compare('aprendo-nest-2026', passwordHash)).resolves.toBe(true);
-    expect(result).toEqual({ id: 1, email: 'ana@example.com', createdAt });
+    expect(result).toEqual({ id: 1, email: 'ana@example.com', role: UserRole.STUDENT, createdAt });
     expect(JSON.stringify(result)).not.toContain('password');
   });
 
@@ -67,6 +69,7 @@ describe('AuthService', () => {
       id: 1,
       email: 'ana@example.com',
       passwordHash,
+      role: UserRole.TEACHER,
       createdAt: new Date(),
     };
     usersService.findByEmailWithPassword.mockResolvedValue(user);
@@ -74,10 +77,14 @@ describe('AuthService', () => {
     const result = await service.login({ email: user.email, password });
 
     expect(usersService.findByEmailWithPassword).toHaveBeenCalledWith(user.email);
-    expect(jwtService.signAsync).toHaveBeenCalledWith({ sub: user.id, email: user.email });
+    expect(jwtService.signAsync).toHaveBeenCalledWith({
+      sub: user.id,
+      email: user.email,
+      role: UserRole.TEACHER,
+    });
     expect(result).toEqual({
       accessToken: 'signed-test-token',
-      user: { id: user.id, email: user.email, createdAt: user.createdAt },
+      user: { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt },
     });
     expect(JSON.stringify(result.user)).not.toMatch(/password/i);
   });
@@ -93,6 +100,7 @@ describe('AuthService', () => {
       id: 7,
       email: 'ana@example.com',
       passwordHash: await bcrypt.hash(password, 4),
+      role: UserRole.ADMIN,
       createdAt: new Date(),
     };
     usersService.findByEmailWithPassword.mockResolvedValue(user);
@@ -103,10 +111,10 @@ describe('AuthService', () => {
     const result = await service.login({ email: user.email, password });
     const payload = await configuredJwtService.verifyAsync(result.accessToken);
 
-    expect(payload).toMatchObject({ sub: user.id, email: user.email });
+    expect(payload).toMatchObject({ sub: user.id, email: user.email, role: UserRole.ADMIN });
     expect(payload).toHaveProperty('iat');
     expect(payload).toHaveProperty('exp');
-    expect(Object.keys(payload).sort()).toEqual(['email', 'exp', 'iat', 'sub']);
+    expect(Object.keys(payload).sort()).toEqual(['email', 'exp', 'iat', 'role', 'sub']);
   });
 
   it('rejects an incorrect password with a generic unauthorized response', async () => {
@@ -114,6 +122,7 @@ describe('AuthService', () => {
       id: 1,
       email: 'ana@example.com',
       passwordHash: await bcrypt.hash('aprendo-nest-2026', 4),
+      role: UserRole.STUDENT,
       createdAt: new Date(),
     });
 
