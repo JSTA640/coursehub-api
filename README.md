@@ -296,6 +296,23 @@ npm test -- update-course
 Detalle, fallo intencional y cierre en
 [docs/sesion-23-pruebas-jest.md](docs/sesion-23-pruebas-jest.md).
 
+## Controladores, cobertura y calidad de pruebas (Sesión 24)
+
+`CoursesController` se prueba como puente HTTP con el caso de uso y el servicio
+simulados: verifica que entrega el id, el body intacto y el usuario autenticado,
+y que los errores (403/404) se propagan sin convertirse en un falso 200.
+
+```bash
+npm test -- courses.controller   # pruebas del controlador
+npm run test:cov                 # cobertura (carpeta coverage/)
+```
+
+La cobertura reveló que `CoursesService.remove` (409 al borrar un curso con
+matrículas) no estaba probada. Se añadieron esas pruebas: `courses.service.ts`
+pasó de 40 % a 100 % de líneas y el proyecto de 106 a 119 pruebas. Análisis y
+cierre en
+[docs/sesion-24-controladores-cobertura.md](docs/sesion-24-controladores-cobertura.md).
+
 ## Persistencia, reglas y respuestas
 
 El listado de cursos responde `{ items, meta }`. `page` inicia en `1`,

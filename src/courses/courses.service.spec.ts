@@ -1,3 +1,4 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -16,6 +17,7 @@ describe('CoursesService', () => {
     findOneBy: jest.Mock<AsyncFn>;
     create: jest.Mock<AnyFn>;
     save: jest.Mock<AnyFn>;
+    remove: jest.Mock<AsyncFn>;
   };
 
   beforeEach(async () => {
@@ -24,6 +26,7 @@ describe('CoursesService', () => {
       findOneBy: jest.fn<AsyncFn>(),
       create: jest.fn<AnyFn>((data) => ({ ...(data as object) })),
       save: jest.fn<AnyFn>(async (entity) => entity),
+      remove: jest.fn<AsyncFn>(async () => undefined),
     };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,6 +81,59 @@ describe('CoursesService', () => {
       order: { id: 'ASC' },
       skip: 0,
       take: 10,
+    });
+  });
+
+  // Sesión 24: ramas detectadas sin cubrir con `npm run test:cov` (líneas 39-41 y 51-69).
+  describe('findOne and remove', () => {
+    const course = { id: 7, title: 'NestJS', level: 'beginner', createdByUserId: 4 };
+
+    it('returns 404 with the course id when the course does not exist', async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.findOne(999)).rejects.toThrow(
+        new NotFoundException('El curso con ID 999 no existe'),
+      );
+      expect(repository.findOneBy).toHaveBeenCalledWith({ id: 999 });
+    });
+
+    it('removes an existing course and returns it', async () => {
+      repository.findOneBy.mockResolvedValue(course);
+
+      await expect(service.remove(7)).resolves.toBe(course);
+      expect(repository.remove).toHaveBeenCalledWith(course);
+    });
+
+    it('does not try to remove a course that does not exist', async () => {
+      repository.findOneBy.mockResolvedValue(null);
+
+      await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+      expect(repository.remove).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a course with enrollments with 409 (foreign key 23503)', async () => {
+      repository.findOneBy.mockResolvedValue(course);
+      repository.remove.mockRejectedValue({ driverError: { code: '23503' } });
+
+      await expect(service.remove(7)).rejects.toThrow(
+        new ConflictException('No se puede eliminar un curso con matrículas existentes.'),
+      );
+    });
+
+    it('rethrows unexpected database errors instead of hiding them as 409', async () => {
+      const failure = { driverError: { code: '57P01' } };
+      repository.findOneBy.mockResolvedValue(course);
+      repository.remove.mockRejectedValue(failure);
+
+      await expect(service.remove(7)).rejects.toBe(failure);
+    });
+
+    it('rethrows errors without a driverError unchanged', async () => {
+      const failure = new Error('connection lost');
+      repository.findOneBy.mockResolvedValue(course);
+      repository.remove.mockRejectedValue(failure);
+
+      await expect(service.remove(7)).rejects.toBe(failure);
     });
   });
 
