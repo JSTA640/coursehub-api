@@ -278,6 +278,24 @@ mismos mensajes. La regla se prueba con un repositorio en memoria, sin HTTP ni
 PostgreSQL. Detalle y cierre en
 [docs/sesion-22-casos-de-uso.md](docs/sesion-22-casos-de-uso.md).
 
+## Pruebas de reglas de negocio con Jest (Sesión 23)
+
+`UpdateCourseUseCase` se prueba con un **repositorio simulado** (`jest.fn()`)
+registrado con `Test.createTestingModule` en lugar del adaptador TypeORM, sin
+HTTP ni PostgreSQL:
+
+```bash
+npm test -- update-course
+```
+
+| Archivo | Enfoque |
+| --- | --- |
+| `src/courses/application/use-cases/update-course.use-case.mock.spec.ts` | Mock: éxito (propietario/admin), 404 y 403, verificando que `save` no se llama al rechazar |
+| `src/courses/application/use-cases/update-course.use-case.spec.ts` | Repositorio falso en memoria (Sesión 22) |
+
+Detalle, fallo intencional y cierre en
+[docs/sesion-23-pruebas-jest.md](docs/sesion-23-pruebas-jest.md).
+
 ## Persistencia, reglas y respuestas
 
 El listado de cursos responde `{ items, meta }`. `page` inicia en `1`,
@@ -390,7 +408,8 @@ Invoke-RestMethod "http://localhost:3000/enrollments?studentId=$($student.id)&co
 ## Pruebas
 
 ```bash
-npm test
+npm test                    # todas las pruebas unitarias
+npm test -- update-course   # solo las suites cuyo nombre contiene "update-course"
 npm run test:e2e
 npm run test:cov
 ```
