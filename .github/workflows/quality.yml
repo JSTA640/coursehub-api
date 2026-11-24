@@ -1,0 +1,91 @@
+# Sesión 26 · Señal de calidad repetible antes de integrar un cambio.
+# Cada paso tiene un nombre claro: en GitHub se ve qué control falló sin leer toda la salida.
+name: quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Solo lectura: el flujo verifica, no publica nada.
+permissions:
+  contents: read
+
+# Si llega un commit nuevo a la misma rama, se cancela la ejecución anterior.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, pruebas unitarias y build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node (versión de .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias desde package-lock.json (npm ci)
+        run: npm ci
+
+      - name: Análisis estático (oxlint)
+        run: npm run lint
+
+      - name: Pruebas unitarias (Jest)
+        run: npm test -- --runInBand
+
+      - name: Compilación (nest build)
+        run: npm run build
+
+  e2e:
+    name: Pruebas e2e con PostgreSQL
+    runs-on: ubuntu-latest
+    # Base desechable solo para CI; coincide con .env.test (sin credenciales reales).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: coursehub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node (versión de .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Instalar dependencias desde package-lock.json (npm ci)
+        run: npm ci
+
+      - name: Pruebas e2e (Supertest + coursehub_test)
+        run: npm run test:e2e
+
+  dependency-review:
+    name: Revisión de dependencias del PR
+    # Solo tiene sentido en un PR: compara las dependencias que el cambio agrega o modifica.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Bloquear dependencias nuevas con vulnerabilidades altas o críticas
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high

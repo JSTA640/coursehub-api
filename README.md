@@ -330,6 +330,20 @@ npm run test:e2e
 rol insuficiente. Detalle y capturas:
 [docs/sesion-25-pruebas-e2e.md](docs/sesion-25-pruebas-e2e.md).
 
+## Integración continua con GitHub Actions (Sesión 26)
+
+El flujo [`.github/workflows/quality.yml`](.github/workflows/quality.yml) se ejecuta en
+cada Pull Request y en cada push a `main`:
+
+| Job | Controles |
+| --- | --- |
+| Lint, pruebas unitarias y build | `npm ci` → `npm run lint` → `npm test -- --runInBand` → `npm run build` |
+| Pruebas e2e con PostgreSQL | servicio `postgres:17` + `npm run test:e2e` |
+| Revisión de dependencias del PR | `dependency-review-action`, bloquea vulnerabilidades altas o críticas |
+
+Detalle, capturas y auditoría de dependencias:
+[docs/sesion-26-github-actions.md](docs/sesion-26-github-actions.md).
+
 ## Persistencia, reglas y respuestas
 
 El listado de cursos responde `{ items, meta }`. `page` inicia en `1`,
