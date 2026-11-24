@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import pg from 'pg';
 
 export function buildTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {
   const nodeEnv = config.getOrThrow<string>('NODE_ENV');
@@ -17,6 +18,8 @@ export function buildTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions
 
   return {
     type: 'postgres',
+    // Driver explícito: bajo Jest ESM, TypeORM no logra cargar 'pg' con require().
+    driver: pg,
     host,
     port,
     username: config.getOrThrow<string>('DB_USER'),

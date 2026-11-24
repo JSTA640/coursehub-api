@@ -2,7 +2,6 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module.js';
 import { Course } from '../src/courses/entities/course.entity.js';
@@ -10,9 +9,10 @@ import { Enrollment } from '../src/enrollments/entities/enrollment.entity.js';
 import { Student } from '../src/students/entities/student.entity.js';
 import { User } from '../src/users/entities/user.entity.js';
 import { UserRole } from '../src/users/user-role.enum.js';
+import { resetDatabase } from './utils/e2e-app.js';
 
 describe('AppController (e2e)', () => {
-  let app: INestApplication<App> | undefined;
+  let app: INestApplication | undefined;
   let studentId: number | undefined;
   let otherStudentId: number | undefined;
   let enrollmentId: number | undefined;
@@ -20,7 +20,7 @@ describe('AppController (e2e)', () => {
   let userId: number | undefined;
   let courseIds: number[] = [];
 
-  async function createApp(): Promise<INestApplication<App>> {
+  async function createApp(): Promise<INestApplication> {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -30,7 +30,7 @@ describe('AppController (e2e)', () => {
       .useValue({ canActivate: () => true })
       .compile();
 
-    const application = moduleFixture.createNestApplication<App>();
+    const application = moduleFixture.createNestApplication();
     application.useGlobalPipes(
       new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
     );
@@ -39,7 +39,10 @@ describe('AppController (e2e)', () => {
   }
 
   // Cuenta de práctica con rol admin asignado directamente en la base de datos.
-  async function createAdminToken(server: App, tag: string): Promise<string> {
+  async function createAdminToken(
+    server: ReturnType<INestApplication['getHttpServer']>,
+    tag: string,
+  ): Promise<string> {
     const email = `admin-e2e-${tag}@example.edu`;
     const password = 'practice-password-2026';
     const registration = await request(server)
@@ -60,6 +63,8 @@ describe('AppController (e2e)', () => {
     userId = undefined;
     courseIds = [];
     app = await createApp();
+    // Sesión 25: base coursehub_test reinicializada antes de cada caso.
+    await resetDatabase(app);
   });
 
   it('registers and authenticates accounts without exposing credentials', async () => {

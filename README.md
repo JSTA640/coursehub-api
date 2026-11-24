@@ -313,6 +313,23 @@ pasó de 40 % a 100 % de líneas y el proyecto de 106 a 119 pruebas. Análisis y
 cierre en
 [docs/sesion-24-controladores-cobertura.md](docs/sesion-24-controladores-cobertura.md).
 
+## Pruebas de integración y end-to-end (Sesión 25)
+
+Las pruebas e2e levantan `AppModule` completo y llaman a la API por HTTP con
+Supertest, usando una base **aislada** (`coursehub_test`, configurada en
+`.env.test`, sin credenciales reales). Antes de cada caso, el esquema se borra y se
+vuelve a crear, así que los resultados se repiten y no dependen del orden.
+
+```bash
+createdb -h localhost -U postgres coursehub_test   # una sola vez por equipo
+npm run test:e2e
+```
+
+`test/courses.e2e-spec.ts` cubre `GET /courses`, `POST /courses` autenticado
+(admin/docente), 400 de validación, 401 sin token o con token alterado y 403 por
+rol insuficiente. Detalle y capturas:
+[docs/sesion-25-pruebas-e2e.md](docs/sesion-25-pruebas-e2e.md).
+
 ## Persistencia, reglas y respuestas
 
 El listado de cursos responde `{ items, meta }`. `page` inicia en `1`,

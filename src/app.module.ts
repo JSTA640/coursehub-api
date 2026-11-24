@@ -23,6 +23,8 @@ import { DiagnosticsController } from './diagnostics/diagnostics.controller.js';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // Las pruebas e2e (NODE_ENV=test) leen .env.test: base aislada, sin credenciales reales.
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
       validationSchema: envValidationSchema,
     }),
     TypeOrmModule.forRootAsync({
